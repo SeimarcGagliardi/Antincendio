@@ -91,25 +91,27 @@ class MsBusinessFatturaService
         $refs = $this->numeri->nextNumero('A','P',$anno); // tm_tipork='A', tm_serie='P'
         $tm_tipork = $refs['tipork']; $tm_serie = $refs['serie']; $tm_anno = $refs['anno']; $tm_numdoc = $refs['numero'];
         $tm_datdoc = ($dataDocumento ?? now())->toDateString();
+        $tm_datdocYmd = ($dataDocumento ?? now())->format('Ymd'); // 20251020
+        $tm_datdocSql = DB::raw("CONVERT(datetime, '{$tm_datdocYmd}', 112)");
 
         // 4) Insert testata + righe (MSSQL)
         DB::connection(self::CONN)->transaction(function () use (
-            $p,$conto,$ivaTestata,$codTpbf,$causaleMag,$tm_tipork,$tm_serie,$tm_anno,$tm_numdoc,$tm_datdoc
-        ) {
-            // TESTATA
-            DB::connection(self::CONN)->table(self::T_TESTATA)->insert([
-                'tm_tipork' => $tm_tipork,
-                'tm_anno'   => $tm_anno,
-                'tm_serie'  => $tm_serie,
-                'tm_numdoc' => $tm_numdoc,
-                'tm_datdoc' => $tm_datdoc,
-                'tm_conto'  => $conto,
-                'tm_conto2' => $conto,
-                'tm_tipobf' => $codTpbf,          // anagra.an_codtpbf
-                'tm_magaz'  => 1,
-                'tm_causale'=> $causaleMag,       // tabtpbf.tb_tcaumag
-                'tm_codese' => $ivaTestata,       // IVA testata come richiesto
-            ]);
+                $p,$conto,$ivaTestata,$codTpbf,$causaleMag,
+                $tm_tipork,$tm_serie,$tm_anno,$tm_numdoc,$tm_datdocSql
+            ) {
+                DB::connection(self::CONN)->table(self::T_TESTATA)->insert([
+                    'tm_tipork' => $tm_tipork,
+                    'tm_anno'   => $tm_anno,
+                    'tm_serie'  => $tm_serie,
+                    'tm_numdoc' => $tm_numdoc,
+                    'tm_datdoc' => $tm_datdocSql,   // << qui l'espressione SQL
+                    'tm_conto'  => $conto,
+                    'tm_conto2' => $conto,
+                    'tm_tipobf' => $codTpbf,
+                    'tm_magaz'  => 1,
+                    'tm_causale'=> $causaleMag,
+                    'tm_codese' => $ivaTestata ?? 0,
+                ]);
 
             // RIGHE (10, 20, 30…)
             $riga = 10;
