@@ -130,23 +130,36 @@ class ImportaPresidi extends Component
                     $joined     = collect($cells)->reduce(
                         fn($agg, $c) => $agg.' '.self::cellText($c), '');
 
-                    $this->anteprima[] = [
-                        'categoria'         => 'Estintore',
-                        'progressivo'       => (int)$c0,
-                        'ubicazione'        => $c1,
-                        'tipo_contratto'    => $c2,
-                        'tipo_estintore'    => $c3,
-                        'tipo_estintore_id' => $tipoEst?->id,
-                        'data_serbatoio'    => $dataSerb,
-                        'data_revisione'    => self::addYears($dataSerb, $classi?->anni_revisione_prima),
-                        'data_collaudo'     => $dataColl,
-                        'data_fine_vita'    => self::addYears($dataSerb, $classi?->anni_fine_vita),
-                        'data_sostituzione' => null,
-                        'flag_anomalia1'    => str_contains($joined, 'CARTELLO'),
-                        'flag_anomalia2'    => str_contains($joined, 'TERRA'),
-                        'flag_anomalia3'    => str_contains($joined, 'NUMERAZ'),
-                        'note'              => null,
-                    ];
+                        $periodoRev = self::pickPeriodoRevisione($dataSerb, $classi);
+                        $dataRevisione = self::nextDueAfter($dataSerb, $periodoRev); // <-- roll forward
+                        
+                        // Collaudo (solo se definito per la classificazione)
+                        $dataCollaudo = null;
+                        if (!empty($classi?->anni_collaudo)) {
+                            $dataCollaudo = self::nextDueAfter($dataSerb, (int) $classi->anni_collaudo);
+                        }
+                        
+                        // Fine vita: NON si “rolla”; è una data assoluta
+                        $dataFineVita = self::addYears($dataSerb, $classi?->anni_fine_vita);
+                        
+                        $this->anteprima[] = [
+                            'categoria'         => 'Estintore',
+                            'progressivo'       => (int)$c0,
+                            'ubicazione'        => $c1,
+                            'tipo_contratto'    => $c2,
+                            'tipo_estintore'    => $c3,
+                            'tipo_estintore_id' => $tipoEst?->id,
+                            'data_serbatoio'    => $dataSerb,
+                            'data_revisione'    => $dataRevisione,
+                            'data_collaudo'     => $dataCollaudo,
+                            'data_fine_vita'    => $dataFineVita,
+                            'data_sostituzione' => null, // la calcoleremo dopo come min(...) se ti serve già ora
+                            'flag_anomalia1'    => str_contains($joined, 'CARTELLO'),
+                            'flag_anomalia2'    => str_contains($joined, 'TERRA'),
+                            'flag_anomalia3'    => str_contains($joined, 'NUMERAZ'),
+                            'note'              => null,
+                        ];
+                        
                 }
             }
         }
@@ -332,7 +345,7 @@ class ImportaPresidi extends Component
     {
         return view('livewire.presidi.importa-presidi');
     }
-}
+
 
 private static function nextDueAfter(?string $start, ?int $periodYears, ?Carbon $today = null): ?string
 {
@@ -359,4 +372,13 @@ private static function pickPeriodoRevisione(?string $dataSerbatoio, $classi): ?
         return (int) $classi->anni_revisione_dopo;
     }
     return (int) $classi->anni_revisione_prima;
+}
+
+private static function minDate(?string ...$dates): ?string
+{
+    $valid = array_filter($dates);
+    if (!$valid) return null;
+    return collect($valid)->min();
+}
+
 }
