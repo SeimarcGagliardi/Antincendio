@@ -9,10 +9,7 @@
             </button>
         </div>
 
-        <select wire:model="vista" class="select select-sm select-bordered">
-            <option value="schede">Schede</option>
-            <option value="tabella">Tabella</option>
-        </select>
+
     </div>
 
     {{-- Nessun intervento --}}
