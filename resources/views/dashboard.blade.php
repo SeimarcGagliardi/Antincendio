@@ -108,7 +108,7 @@
     {{-- Blocchi “operativi” condivisi --}}
     @if ($isAdmin || $isTecnico)
         <div class="bg-white shadow border p-4 rounded">
-            <h2 class="text-lg font-bold mb-4">📅 Interventi assegnati</h2>
+            <h2 class="text-lg font-bold mb-4">📅 Interventi assegnati (Sono francesco)</h2>
             <livewire:interventi.evadi-interventi />
         </div>
     @endif
