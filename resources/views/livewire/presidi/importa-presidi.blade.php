@@ -11,8 +11,20 @@
         @error('file') <span class="text-red-600 text-xs">{{ $message }}</span> @enderror
     </form>
 
+    {{-- Nota mesi preferiti --}}
+    <p class="text-xs text-gray-600">
+        Le date di <strong>revisione</strong>, <strong>collaudo</strong> e <strong>sostituzione</strong> sono
+        allineate ai mesi preferiti del cliente (se configurati). Se non presenti, si usa
+        il mese precedente la scadenza ma non prima del mese attuale.
+    </p>
+
     {{-- ============ ANTEPRIMA LETTA ============ --}}
     @if($anteprima)
+        @php
+            $showAcq   = collect($anteprima)->contains(fn($r) => !empty($r['data_acquisto']));
+            $showScadP = collect($anteprima)->contains(fn($r) => !empty($r['scadenza_presidio']));
+        @endphp
+
         <div class="mt-4">
             <h3 class="text-lg font-semibold mb-2">Anteprima presidi rilevati</h3>
 
@@ -21,20 +33,23 @@
                     <thead class="bg-gray-200">
                         <tr>
                             <th class="px-2 py-1 w-20">Prog.</th>
-                            <th class="px-2 py-1 w-32">Categoria</th>
+                            <th class="px-2 py-1 w-28">Categoria</th>
                             <th class="px-2 py-1">Ubicazione</th>
                             <th class="px-2 py-1">Tipo</th>
+                            <th class="px-2 py-1 w-32">Contratto</th>
                             <th class="px-2 py-1 w-40">Serbatoio&nbsp;<span class="text-red-600">*</span></th>
-                            <th class="px-2 py-1 w-40">Revisione</th>
-                            <th class="px-2 py-1 w-40">Collaudo</th>
-                            <th class="px-2 py-1 w-32">Anomalie</th>
-
-                            <th class="px-2 py-1 w-32">Azioni</th>
+                            <th class="px-2 py-1 w-40">Revisione (all.)</th>
+                            <th class="px-2 py-1 w-40">Collaudo (all.)</th>
+                            <th class="px-2 py-1 w-40">Fine vita</th>
+                            @if($showAcq)   <th class="px-2 py-1 w-40">Acquisto</th> @endif
+                            @if($showScadP) <th class="px-2 py-1 w-40">Scadenza Presidio</th> @endif
+                            <th class="px-2 py-1 w-40">Sostituzione (operativa)</th>
+                            <th class="px-2 py-1 w-16 text-center">Azioni</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach($anteprima as $r => $row)
-                            @php($missing = !$row['data_serbatoio'])
+                            @php($missing = !$row['data_serbatoio'] || !$row['tipo_estintore_id'])
                             <tr wire:key="preview-{{ $r }}"
                                 class="{{ $loop->even ? 'bg-gray-50' : '' }} {{ $missing ? 'bg-yellow-100' : '' }}">
 
@@ -49,7 +64,9 @@
                                 <td class="px-2 py-1">
                                     <select wire:model.defer="anteprima.{{ $r }}.categoria"
                                             class="form-select w-full text-xs">
-                                        <option>Estintore</option><option>Idrante</option><option>Porta</option>
+                                        <option>Estintore</option>
+                                        <option>Idrante</option>
+                                        <option>Porta</option>
                                     </select>
                                 </td>
 
@@ -73,6 +90,12 @@
                                     @enderror
                                 </td>
 
+                                {{-- contratto --}}
+                                <td class="px-2 py-1">
+                                    <input wire:model.defer="anteprima.{{ $r }}.tipo_contratto"
+                                           class="form-input w-full text-xs">
+                                </td>
+
                                 {{-- serbatoio --}}
                                 <td class="px-2 py-1">
                                     <input type="date"
@@ -83,25 +106,53 @@
                                     @enderror
                                 </td>
 
+                                {{-- revisione (allineata) --}}
                                 <td class="px-2 py-1">
                                     <input type="date"
                                            wire:model.defer="anteprima.{{ $r }}.data_revisione"
                                            class="form-input w-full text-xs">
                                 </td>
 
+                                {{-- collaudo (allineato) --}}
                                 <td class="px-2 py-1">
                                     <input type="date"
                                            wire:model.defer="anteprima.{{ $r }}.data_collaudo"
                                            class="form-input w-full text-xs">
                                 </td>
 
-                                {{-- anomalie --}}
-                                <td class="px-2 py-1 text-center space-x-1">
-                                    @for($f = 1; $f <= 3; $f++)
-                                        <input type="checkbox" class="form-checkbox"
-                                               wire:model.defer="anteprima.{{ $r }}.flag_anomalia{{ $f }}">
-                                    @endfor
+                                {{-- fine vita --}}
+                                <td class="px-2 py-1">
+                                    <input type="date"
+                                           wire:model.defer="anteprima.{{ $r }}.data_fine_vita"
+                                           class="form-input w-full text-xs">
                                 </td>
+
+                                {{-- acquisto opzionale --}}
+                                @if($showAcq)
+                                    <td class="px-2 py-1">
+                                        <input type="date"
+                                               wire:model.defer="anteprima.{{ $r }}.data_acquisto"
+                                               class="form-input w-full text-xs">
+                                    </td>
+                                @endif
+
+                                {{-- scadenza presidio opzionale --}}
+                                @if($showScadP)
+                                    <td class="px-2 py-1">
+                                        <input type="date"
+                                               wire:model.defer="anteprima.{{ $r }}.scadenza_presidio"
+                                               class="form-input w-full text-xs">
+                                    </td>
+                                @endif
+
+                                {{-- sostituzione operativa --}}
+                                <td class="px-2 py-1">
+                                    <input type="date"
+                                           wire:model.defer="anteprima.{{ $r }}.data_sostituzione"
+                                           class="form-input w-full text-xs">
+                                </td>
+
+                                {{-- azioni --}}
                                 <td class="px-2 py-1 text-center">
                                     <button wire:click="eliminaRigaAnteprima({{ $r }})"
                                             class="text-red-600 hover:text-red-800">
@@ -120,9 +171,9 @@
                     <i class="fa fa-check mr-1"></i> Salva per conferma successiva
                 </button>
 
-                @if(collect($anteprima)->contains(fn($r) => !$r['data_serbatoio']))
+                @if(collect($anteprima)->contains(fn($r) => !$r['data_serbatoio'] || !$r['tipo_estintore_id']))
                     <p class="text-xs text-red-600">
-                        Completa le <strong>date serbatoio</strong> evidenziate prima di salvare.
+                        Completa <strong>Tipo estintore</strong> e <strong>Data serbatoio</strong> prima di salvare.
                     </p>
                 @endif
             </div>
@@ -149,27 +200,38 @@
             </select>
         </div>
 
+        @php
+            $showAcqS   = collect($presidiSalvati)->contains(fn($r) => !empty($r['data_acquisto']));
+            $showScadPS = collect($presidiSalvati)->contains(fn($r) => !empty($r['scadenza_presidio']));
+        @endphp
+
         {{-- tabella --}}
         <div class="overflow-x-auto border rounded shadow-sm">
             <table class="min-w-full text-sm text-left text-gray-800">
                 <thead class="bg-gray-100">
                     <tr>
                         <th class="px-2 py-1 w-8"></th>
-                        <th class="px-2 py-1 w-32">Categoria</th>
+                        <th class="px-2 py-1 w-28">Categoria</th>
                         <th class="px-2 py-1">Ubicazione</th>
                         <th class="px-2 py-1">Tipo</th>
                         <th class="px-2 py-1 w-20">Prog.</th>
-                        <th class="px-2 py-1 w-40">Serbatoio</th>
+                        <th class="px-2 py-1 w-32">Contratto</th>
+                        <th class="px-2 py-1 w-36">Serbatoio</th>
+                        <th class="px-2 py-1 w-36">Revisione</th>
+                        <th class="px-2 py-1 w-36">Collaudo</th>
+                        <th class="px-2 py-1 w-36">Fine vita</th>
+                        @if($showAcqS)   <th class="px-2 py-1 w-36">Acquisto</th> @endif
+                        @if($showScadPS) <th class="px-2 py-1 w-40">Scadenza Presidio</th> @endif
+                        <th class="px-2 py-1 w-40">Sostituzione</th>
                         <th class="px-2 py-1 w-24 text-center">Esito</th>
-                        <th class="px-2 py-1 w-8 text-center"></th>  <!-- nuova colonna icona delete -->
-
+                        <th class="px-2 py-1 w-8 text-center"></th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach(collect($presidiSalvati)
                             ->when($filtroCategoria,
                                    fn($c)=>$c->where('categoria',$filtroCategoria)) as $i => $p)
-                        @php($missing = !$p['data_serbatoio'])
+                        @php($missing = !$p['data_serbatoio'] || !$p['tipo_estintore_id'])
                         <tr wire:key="row-{{ $p['id'] }}"
                             class="{{ $loop->even ? 'bg-gray-50' : '' }} {{ $missing ? 'bg-yellow-100' : '' }}">
 
@@ -183,7 +245,9 @@
                             <td class="px-2 py-1">
                                 <select wire:model.defer="presidiSalvati.{{ $i }}.categoria"
                                         class="form-select text-xs w-full">
-                                    <option>Estintore</option><option>Idrante</option><option>Porta</option>
+                                    <option>Estintore</option>
+                                    <option>Idrante</option>
+                                    <option>Porta</option>
                                 </select>
                             </td>
 
@@ -210,8 +274,54 @@
                             </td>
 
                             <td class="px-2 py-1">
+                                <input
+                                    wire:model.defer="presidiSalvati.{{ $i }}.tipo_contratto"
+                                    class="form-input w-full text-xs">
+                            </td>
+
+                            <td class="px-2 py-1">
                                 <input type="date"
                                        wire:model.defer="presidiSalvati.{{ $i }}.data_serbatoio"
+                                       class="form-input w-full text-xs">
+                            </td>
+
+                            <td class="px-2 py-1">
+                                <input type="date"
+                                       wire:model.defer="presidiSalvati.{{ $i }}.data_revisione"
+                                       class="form-input w-full text-xs">
+                            </td>
+
+                            <td class="px-2 py-1">
+                                <input type="date"
+                                       wire:model.defer="presidiSalvati.{{ $i }}.data_collaudo"
+                                       class="form-input w-full text-xs">
+                            </td>
+
+                            <td class="px-2 py-1">
+                                <input type="date"
+                                       wire:model.defer="presidiSalvati.{{ $i }}.data_fine_vita"
+                                       class="form-input w-full text-xs">
+                            </td>
+
+                            @if($showAcqS)
+                                <td class="px-2 py-1">
+                                    <input type="date"
+                                           wire:model.defer="presidiSalvati.{{ $i }}.data_acquisto"
+                                           class="form-input w-full text-xs">
+                                </td>
+                            @endif
+
+                            @if($showScadPS)
+                                <td class="px-2 py-1">
+                                    <input type="date"
+                                           wire:model.defer="presidiSalvati.{{ $i }}.scadenza_presidio"
+                                           class="form-input w-full text-xs">
+                                </td>
+                            @endif
+
+                            <td class="px-2 py-1">
+                                <input type="date"
+                                       wire:model.defer="presidiSalvati.{{ $i }}.data_sostituzione"
                                        class="form-input w-full text-xs">
                             </td>
 
@@ -219,6 +329,7 @@
                                 {!! $missing ? '<span class="text-red-600">⚠️</span>'
                                              : '<span class="text-green-600">✓</span>' !!}
                             </td>
+
                             <td class="px-2 py-1 text-center">
                                 <button wire:click="eliminaImportato({{ $p['id'] }})"
                                         class="text-red-600 hover:text-red-800">
@@ -253,7 +364,6 @@
                     class="bg-red-600 text-white px-4 py-2 rounded shadow hover:bg-red-700 transition">
                 <i class="fa fa-trash-alt mr-1"></i> Cancella selezionati
             </button>
-
         </div>
     @endif
 </div>
