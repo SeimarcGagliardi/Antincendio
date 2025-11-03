@@ -23,6 +23,7 @@ class Cliente extends Model
         'codice_esterno',
         'mesi_visita',
         'minuti_intervento',
+        ''
     ];
     protected $casts = [
         'mesi_visita' => 'array',

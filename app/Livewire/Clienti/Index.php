@@ -46,38 +46,31 @@ class Index extends Component
 
     public function render()
     {
-        if ($this->searchReady && strlen($this->search) >= 3) {
-            $search = $this->normalize($this->search);
+        $query = Cliente::query();
 
-            $query = Cliente::all()->filter(function ($cliente) use ($search) {
-                $concatenated = collect([
-                    $cliente->nome,
-                    $cliente->p_iva,
-                    $cliente->email,
-                    $cliente->telefono,
-                    $cliente->indirizzo,
-                    $cliente->cap,
-                    $cliente->citta,
-                    $cliente->provincia,
-                ])->implode(' ');
+        if ($this->searchReady && strlen(trim($this->search)) >= 3) {
+            $raw  = trim($this->search);
+            $like = "%{$raw}%";
 
-                return str_contains($this->normalize($concatenated), $search);
+            $query->where(function ($q) use ($like, $raw) {
+                $q->where('nome', 'like', $like)
+                ->orWhere('p_iva', 'like', $like)
+                ->orWhere('email', 'like', $like)
+                ->orWhere('telefono', 'like', $like)
+                ->orWhere('indirizzo', 'like', $like)
+                ->orWhere('cap', 'like', $like)
+                ->orWhere('citta', 'like', $like)
+                ->orWhere('provincia', 'like', $like)
+                // <-- qui la ricerca anche su codice_esterno
+                ->orWhere('codice_esterno', 'like', ctype_digit($raw) ? "{$raw}%" : $like);
             });
-
-            $paginator = new LengthAwarePaginator(
-                $query->forPage($this->getPage(), $this->perPage),
-                $query->count(),
-                $this->perPage,
-                $this->getPage(),
-                ['path' => request()->url(), 'query' => request()->query()]
-            );
-        } else {
-            $paginator = Cliente::orderBy('nome')
-                ->paginate($this->perPage);
         }
+
+        $paginator = $query->orderBy('nome')->paginate($this->perPage);
 
         return view('livewire.clienti.index', [
             'clienti' => $paginator,
         ])->layout('layouts.app');
     }
+
 }

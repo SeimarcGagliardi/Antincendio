@@ -26,17 +26,209 @@ class ImportaPresidi extends Component
     public array  $selezionati     = [];   // [ "23", "27", ... ]
     public array $tipiEstintore = [];
     public string $filtroCategoria = '';
+    private ?\Illuminate\Support\Collection $tipiCache = null;
+// --- in cima alla classe ---
+protected array $mesiPreferiti = [];
 
-    /* ------------------ LIFECYCLE ------------------ */
-    public function mount(int $clienteId, ?int $sedeId = null): void
-    {
-        $this->clienteId = $clienteId;
-        $this->sedeId    = $sedeId;
-        $this->tipiEstintore = TipoEstintore::orderBy('descrizione')
-        ->pluck('descrizione', 'id')
-        ->toArray();
-        $this->caricaPresidiSalvati();
+// --- in mount ---
+public function mount(int $clienteId, ?int $sedeId = null): void
+{
+    $this->clienteId = $clienteId;
+    $this->sedeId    = $sedeId;
+    $this->tipiEstintore = TipoEstintore::orderBy('descrizione')
+        ->pluck('descrizione', 'id')->toArray();
+    $this->caricaPresidiSalvati();
+    $this->mesiPreferiti = $this->caricaMesiPreferiti($this->clienteId);
+}
+
+private function loadTipiCache(): void
+{
+    if ($this->tipiCache) return;
+
+    // prendi i campi che ti servono; se hai anche "tipo" (Polvere/CO2/Schiuma) usalo
+    $this->tipiCache = \App\Models\TipoEstintore::query()
+        ->select('id','descrizione','sigla','kg')   // aggiungi qui altri campi se li hai (es. 'tipo')
+        ->orderBy('kg')->orderBy('id')
+        ->get()
+        ->map(function ($t) {
+            $txt = strtoupper($t->descrizione.' '.$t->sigla);
+            return [
+                'id'          => $t->id,
+                'kg'          => (int) $t->kg,
+                'descrizione' => $t->descrizione,
+                'sigla'       => $t->sigla,
+                'agente'      => $this->detectAgent($txt), // deriviamo l’agente dal testo
+                'full'        => $txt,
+            ];
+        });
+}
+
+/** Polvere / CO2 / Schiuma, estratti da una stringa generica */
+private function detectAgent(string $txt): ?string
+{
+    $u = strtoupper($txt);
+    if (preg_match('/\bCO\s*2\b|\bCO2\b|ANIDRIDE\s+CARBONICA/', $u)) return 'CO2';
+    if (preg_match('/POLV|POLVER/', $u))                                  return 'POLVERE';
+    if (preg_match('/SCHI|FOAM|AFFF/', $u))                                return 'SCHIUMA';
+    return null;
+}
+
+private function detectCapacity(string $txt): ?int
+{
+    $u = strtoupper($txt);
+
+    // 9 KG / 6 LT / 2L / 1,5 KG / KG 9 / LT. 6
+    if (preg_match('/\b(\d{1,3})(?:[,.]\d+)?\s*(KG|KGS|KG\.|LT|L|LT\.)\b/u', $u, $m)) {
+        return (int) $m[1];
     }
+    if (preg_match('/\b(KG|KGS|KG\.)\s*(\d{1,3})(?:[,.]\d+)?\b/u', $u, $m)) {
+        return (int) $m[2];
+    }
+    if (preg_match('/\b(LT|L|LT\.)\s*(\d{1,3})(?:[,.]\d+)?\b/u', $u, $m)) {
+        return (int) $m[2];
+    }
+
+    // niente unità → non dedurre nulla
+    return null;
+}
+
+/**
+ * Prova a riconoscere il TipoEstintore dal testo della cella del DOCX (es. “6 Kg Polv”).
+ * Ritorna l’ID migliore o null se non decide.
+ */
+private function guessTipoEstintoreId(string $raw): ?int
+{
+    $this->loadTipiCache();
+    $u   = strtoupper($raw);
+    $kg  = $this->detectCapacity($u);
+    $ag  = $this->detectAgent($u);
+
+    // 1) match pieno: agente + kg
+    $cand = $this->tipiCache
+        ->when($ag, fn($c) => $c->where('agente', $ag))
+        ->when($kg, fn($c) => $c->where('kg', $kg));
+
+    if ($cand->count() === 1) return $cand->first()['id'];
+    if ($cand->count() > 1) {
+        // tiebreak: descrizione che contiene sia agente che numero
+        $best = $cand->firstWhere('full', fn($f) => str_contains($f, (string)$kg));
+        return $best['id'] ?? $cand->first()['id'];
+    }
+
+    // 2) match “forte” solo su agente
+    if ($ag) {
+        $cand = $this->tipiCache->where('agente', $ag);
+        if ($cand->count()) return $cand->first()['id'];
+    }
+
+    // 3) match solo su kg
+    if ($kg) {
+        $cand = $this->tipiCache->where('kg', $kg);
+        if ($cand->count()) return $cand->first()['id'];
+    }
+
+    // 4) nulla di fatto
+    return null;
+}
+// === UTIL PER MESI PREFERITI
+private function caricaMesiPreferiti(int $clienteId): array
+{
+    $cli = \App\Models\Cliente::find($clienteId);
+    if (!$cli) return [];
+    $raw = $cli->mesi_intervento ?? $cli->mesi ?? null;
+    if (is_string($raw)) {
+        return collect(explode(',', $raw))->map(fn($m)=>(int)trim($m))
+            ->filter(fn($m)=>$m>=1 && $m<=12)->unique()->values()->all();
+    }
+    if (is_array($raw)) {
+        return collect($raw)->map(fn($m)=>(int)$m)
+            ->filter(fn($m)=>$m>=1 && $m<=12)->unique()->values()->all();
+    }
+    return [];
+}
+
+private function alignToPreferred(?string $due): ?string
+{
+    if (!$due) return null;
+    $months = $this->mesiPreferiti;
+    $today  = now()->startOfMonth();
+    $dueC   = Carbon::parse($due)->startOfMonth();
+
+    if (!count($months)) {
+        $cand = $dueC->copy()->subMonth();
+        if ($cand->lt($today)) $cand = $today;
+        return $cand->format('Y-m-d');
+    }
+
+    $candidates = [];
+    $cur = $today->copy();
+    while ($cur->lt($dueC)) { // strettamente prima della scadenza
+        if (in_array((int)$cur->month, $months, true)) $candidates[] = $cur->copy();
+        $cur->addMonth();
+    }
+    if ($candidates) return end($candidates)->format('Y-m-d');
+
+    // fallback: primo mese preferito >= oggi entro 24 mesi
+    $cur = $today->copy();
+    for ($i=0;$i<24;$i++){
+        if (in_array((int)$cur->month, $months, true)) return $cur->format('Y-m-d');
+        $cur->addMonth();
+    }
+    return $today->format('Y-m-d');
+}
+
+// === RICALCOLO DATE PER UNA RIGA (anteprima o salvati)
+private function ricalcolaDatePerRiga(array &$row): void
+{
+    $dataSerb = $row['data_serbatoio'] ?? null;
+    $tipoId   = $row['tipo_estintore_id'] ?? null;
+    if (!$dataSerb || !$tipoId) {
+        // se manca uno dei due, azzero le derivate (meglio esplicito)
+        $row['data_revisione']    = null;
+        $row['data_collaudo']     = null;
+        $row['data_fine_vita']    = null;
+        // la sostituzione operativa resta calcolata solo se c’è qualcosa
+        $row['data_sostituzione'] = null;
+        return;
+    }
+
+    $tipo = TipoEstintore::with('classificazione')->find($tipoId);
+    $classi = $tipo?->classificazione;
+
+    $periodoRev    = self::pickPeriodoRevisione($dataSerb, $classi);
+    $scadRevisione = self::nextDueAfter($dataSerb, $periodoRev);
+    $scadCollaudo  = !empty($classi?->anni_collaudo) ? self::nextDueAfter($dataSerb, (int)$classi->anni_collaudo) : null;
+    $fineVita      = self::addYears($dataSerb, $classi?->anni_fine_vita);
+
+    $row['data_revisione'] = $this->visitaOnOrBefore($scadRevisione) ?? $scadRevisione;
+
+    $row['data_collaudo']  = $this->alignToPreferred($scadCollaudo)  ?: $scadCollaudo;
+    $row['data_fine_vita'] = $fineVita;
+
+    // “capolinea” per sostituzione = min scadenze + allineamento
+    $scadenzaAssoluta = self::minDate(
+        $row['data_revisione'],
+        $row['data_collaudo'],
+        $row['data_fine_vita'],
+        $row['scadenza_presidio'] ?? null
+    );
+    $row['data_sostituzione'] = $this->alignToPreferred($scadenzaAssoluta);
+}
+
+// === Azione chiamata da Blade quando cambi tipo o serbatoio
+public function ricalcola(string $scope, int $index): void
+{
+    if ($scope === 'anteprima' && isset($this->anteprima[$index])) {
+        $row = $this->anteprima[$index];
+        $this->ricalcolaDatePerRiga($row);
+        $this->anteprima[$index] = $row;
+    }
+    if ($scope === 'salvati' && isset($this->presidiSalvati[$index])) {
+        $row = $this->presidiSalvati[$index];
+        $this->ricalcolaDatePerRiga($row);
+        $this->presidiSalvati[$index] = $row;
+    }
+}
     private static function normalizzaHeader(string $h): string
     {
         $h = mb_strtoupper(trim(preg_replace('/\s+/', ' ', $h)));
@@ -272,36 +464,39 @@ class ImportaPresidi extends Component
 
                     $ubic      = $r['ubicazione']      ?? '';
                     $contratto = $r['tipo_contratto']   ?? '';
-                    $tipoRaw   = ($r['kglt'] ?? '') ?: ($r['classe'] ?? '');
-
-                    // tipo estintore & kg
-                    preg_match('/(\d+)\s*kg/i', $tipoRaw, $mKg);
-                    $kg      = $mKg[1] ?? null;
-                    $tipoEst = $kg
-                        ? \App\Models\TipoEstintore::where('kg', $kg)
-                            ->where('descrizione', 'like', '%Polv%')->first()
-                        : null;
-                    $classi  = $tipoEst?->classificazione;
+                 
+                    $tipoRaw   = trim((($r['kglt'] ?? '') . ' ' . ($r['classe'] ?? '')));
+                    $joinedUp  = mb_strtoupper(implode(' ', $vals));
+                    
+                    // prima prova col campo dedicato, poi — se vuoto — con tutta la riga
+                    $tipoEstId = $this->guessTipoEstintoreId($tipoRaw !== '' ? $tipoRaw : $joinedUp);
+                    $tipoEst   = $tipoEstId ? TipoEstintore::with('classificazione')->find($tipoEstId) : null;
+                    $classi    = $tipoEst?->classificazione;
 
                     // date specifiche
                     $dataAcquisto     = $parseData($r['anno_acquisto']     ?? null);
                     $scadPresidio     = $parseData($r['scadenza_presidio'] ?? null);
                     $dataSerb         = $parseData($r['anno_serbatoio']    ?? null);
-                    $lastRiempOrRev   = $parseData($r['riempimento_revisione'] ?? null);   // info, non usata nel calcolo
-                    $lastCollaudoRev  = $parseData($r['collaudo_revisione']   ?? null);   // info, non usata nel calcolo
-
+                    $dataUltimaRevisione = self::parseDataCell($r['riempimento_revisione'] ?? null); // <- USATA per la prossima revisione
+                    $lastCollaudoRev     = self::parseDataCell($r['collaudo_revisione']   ?? null); // info (non usata)
+                    
                     // calcoli da serbatoio
-                    $periodoRev    = self::pickPeriodoRevisione($dataSerb, $classi);
-                    $scadRevisione = self::nextDueAfter($dataSerb, $periodoRev);
+                    $periodoRev       = self::pickPeriodoRevisione($dataSerb, $classi);
+                    // Nota: il PERIODO si decide sempre dal serbatoio (cutoff), ma la BASE può essere l'ultima revisione se presente
+                    $baseRevisione    = $dataUltimaRevisione ?: $dataSerb;
+                    $scadRevisione    = self::nextDueAfter($baseRevisione, $periodoRev);
                     $scadCollaudo  = !empty($classi?->anni_collaudo)
                                     ? self::nextDueAfter($dataSerb, (int)$classi->anni_collaudo)
                                     : null;
                     $fineVita      = self::addYears($dataSerb, $classi?->anni_fine_vita);
 
                     // allineamento ai mesi preferiti (revisione/collaudo)
-                    $revAligned = $alignToPreferred($scadRevisione, $mesiPref);
-                    $colAligned = $alignToPreferred($scadCollaudo,  $mesiPref);
-
+                    $revAligned = $this->visitaOnOrBefore($scadRevisione);   // <= inclusiva
+                    $colAligned = $this->visitaOnOrBefore($scadCollaudo);       // <= strettamente prima
+                    $fineAligned= $this->visitaOnOrBefore($fineVita);
+                    
+                   
+                    
                     // scadenza “capolinea” per sostituzione (min di tutte le scadenze note)
                     $scadenzaAssoluta = self::minDate($scadRevisione, $scadCollaudo, $fineVita, $scadPresidio);
                     // data operativa (mese prima, ma non prima di oggi) rispettando i mesi preferiti
@@ -329,9 +524,10 @@ class ImportaPresidi extends Component
                         'data_serbatoio'    => $dataSerb,
 
                         // Scadenze “teoriche”
-                        'data_revisione'    => $revAligned ?: $scadRevisione,
-                        'data_collaudo'     => $colAligned ?: $scadCollaudo,
-                        'data_fine_vita'    => $fineVita,
+                        'data_revisione'    => $revAligned ?? $scadRevisione,
+                        'data_collaudo'     => $colAligned ?? $scadCollaudo,
+                        'data_fine_vita'    => $fineAligned ?? $fineVita,
+                        'data_sostituzione' => $dataSostituzione,
 
                         // Operativa (mese prima della scadenza MIN, rispettando mesi preferiti)
                         'data_sostituzione' => $dataSostituzione,
@@ -416,9 +612,9 @@ class ImportaPresidi extends Component
                 ],
                 $p->only([
                     'ubicazione','tipo_contratto','tipo_estintore','tipo_estintore_id',
-                    'flag_anomalia1','flag_anomalia2','flag_anomalia3','note',
+                    'flag_anomalia1','flag_anomalia2','flag_anomalia3','note','data_acquisto','scadenza_presidio', 
                     'data_serbatoio','data_revisione','data_collaudo',
-                    'data_fine_vita','data_sostituzione',
+                    'data_fine_vita','data_sostituzione','data_ultima_revisione',
                 ])
             );
 
@@ -517,7 +713,7 @@ class ImportaPresidi extends Component
         $this->caricaPresidiSalvati();
 
         // 3. rimuovi dai selezionati (se era spuntato)
-        unset($this->selezionati[$id]);
+        $this->selezionati = array_values(array_diff($this->selezionati, [$id]));
 
         // 4. toast / evento frontend (opzionale)
         $this->dispatch('toast', type: 'success', message: 'Presidio eliminato');
@@ -530,20 +726,78 @@ class ImportaPresidi extends Component
     }
 
 
-private static function nextDueAfter(?string $start, ?int $periodYears, ?Carbon $today = null): ?string
-{
-    if (!$start || !$periodYears || $periodYears <= 0) return null;
+    private const CUTOFF = '2024-08-31';
 
-    $today = $today ?: now()->startOfDay();
-    $due   = Carbon::parse($start)->addYears($periodYears)->startOfMonth();
-
-    // Se la prima scadenza è nel passato, somma multipli del periodo finché non supera "oggi"
-    while ($due->lte($today)) {
-        $due->addYears($periodYears);
+    private static function periodYearsFor(string $dataSerbatoio, int $anniPrima, int $anniDopo): int
+    {
+        // Se il serbatoio è stato costruito entro il 31/08/2024 resta SEMPRE nel regime "prima".
+        $cutoff = Carbon::parse(self::CUTOFF)->endOfDay();
+        return Carbon::parse($dataSerbatoio)->lte($cutoff) ? $anniPrima : $anniDopo;
     }
-    return $due->format('Y-m-d');
-}
+    
+    /**
+     * Calcola la prossima scadenza di revisione > today.
+     * Ritorna 'Y-m-d' (primo giorno del mese della scadenza).
+     */
+    private static function nextDueAfter(?string $start, ?int $periodYears, ?Carbon $today = null): ?string
+    {
+        if (!$start || !$periodYears || $periodYears <= 0) return null;
+    
+        $today = ($today ?? now())->startOfDay();
+    
+        // Prima scadenza dal serbatoio (allineata a inizio mese)
+        $due = Carbon::parse($start)
+            ->startOfMonth()
+            ->addYears($periodYears);
+    
+        // Salta multipli del periodo finché non è > oggi
+        while ($due->lte($today)) {
+            $due->addYears($periodYears);
+        }
+    
+        return $due->format('Y-m-d');
+    }
+    
+    /**
+     * Dato una scadenza, restituisce la "visita subito prima" (mese pianificato < mese scadenza).
+     * Esempio: scadenza 2027-05-01 con visite [5,11] => 2026-11-01.
+     */
+    private static function previousVisitBefore(string $dueYmd, array $visitMonths): string
+    {
+        sort($visitMonths); // es. [5, 11]
+        $due  = Carbon::parse($dueYmd);
+        $year = $due->year;
+        $m    = $due->month;
+    
+        $before = array_values(array_filter($visitMonths, fn($vm) => $vm < $m));
+        if (!empty($before)) {
+            $month = end($before);
+        } else {
+            $month = end($visitMonths);
+            $year -= 1;
+        }
+    
+        return Carbon::create($year, $month, 1)->format('Y-m-d');
+    }
+    private function visitaOnOrBefore(?string $due): ?string
+    {
+        if (!$due) return null;
+        $months = $this->mesiPreferiti ?? [];
+        $dueC   = Carbon::parse($due)->startOfMonth();
 
+        // Nessuna preferenza: per la revisione tieni il mese della scadenza
+        if (!count($months)) {
+            return $dueC->format('Y-m-d');
+        }
+
+        // Se il mese della scadenza è tra i mesi visita → usa quello
+        if (in_array((int)$dueC->month, $months, true)) {
+            return $dueC->format('Y-m-d');
+        }
+
+        // Altrimenti: mese visita immediatamente precedente
+        return self::previousVisitBefore($dueC->format('Y-m-d'), $months);
+    }
 private static function pickPeriodoRevisione(?string $dataSerbatoio, $classi): ?int
 {
     if (!$classi) return null;

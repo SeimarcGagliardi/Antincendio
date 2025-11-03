@@ -32,6 +32,13 @@ class GestionePresidi extends Component
     public $sede;
     public $presidioInModifica = null;
     public $presidiData = [];
+
+    // === Nuovi campi per l'inserimento "in acquisto"
+    public bool $isAcquisto = false;          // toggle "Estintore acquistato"
+    public ?string $dataAcquisto = null;      // Y-m-d
+    public ?string $scadenzaPresidio = null;  // Y-m-d
+    public int $anniScadenzaPresidioDefault = 3; // fallback (vedi nota)
+
     
     protected $rules = [
         'ubicazione' => 'required|string|max:255',
@@ -45,6 +52,9 @@ class GestionePresidi extends Component
         'dataSerbatoio' => 'required_if:categoria,Estintore|date',
         'flagPreventivo' => 'nullable|boolean',
         'descrizione' => 'nullable|string|max:255',
+        'isAcquisto'        => 'boolean',
+        'dataAcquisto'      => 'nullable|date|required_if:isAcquisto,true',
+        'scadenzaPresidio'  => 'nullable|date', // calcolata: la teniamo "nullable" per sicurezza
     ];
 
     public function mount($clienteId, $sedeId = null)
@@ -69,11 +79,39 @@ class GestionePresidi extends Component
     
     
 
+    private function anniScadenzaPresidio(): int
+    {
+        // Seleziona da classificazione (se vuoi), altrimenti default 3
+        if ($this->categoria === 'Estintore' && $this->tipoEstintore) {
+            $tipo = \App\Models\TipoEstintore::with('classificazione')->find($this->tipoEstintore);
+            if ($tipo && $tipo->classificazione && !empty($tipo->classificazione->anni_scadenza_presidio)) {
+                return (int) $tipo->classificazione->anni_scadenza_presidio;
+            }
+        }
+        return $this->anniScadenzaPresidioDefault;
+    }
+    public function aggiornaScadenzaPresidio(): void
+    {
+        if (!$this->isAcquisto || empty($this->dataAcquisto)) {
+            $this->scadenzaPresidio = null;
+            return;
+        }
+        $anni = $this->anniScadenzaPresidio();
+        $this->scadenzaPresidio = \Carbon\Carbon::parse($this->dataAcquisto)
+            ->addYears($anni)->startOfMonth()->format('Y-m-d');
+    }
 public function abilitaModifica($id)
 {
     $this->presidioInModifica = $id;
-    $presidio = Presidio::find($id);
-    $this->presidiData[$id] = $presidio->toArray();
+    $p = Presidio::find($id);
+    $row = $p->toArray();
+
+    foreach (['data_acquisto','scadenza_presidio','data_serbatoio','data_revisione','data_collaudo','data_fine_vita','data_sostituzione'] as $k) {
+        if (!empty($row[$k])) {
+            $row[$k] = \Carbon\Carbon::parse($row[$k])->format('Y-m-d');
+        }
+    }
+    $this->presidiData[$id] = $row;
 }
 public function disattiva($id)
 {
@@ -110,20 +148,67 @@ public function getRiepilogoTipiEstintoriProperty()
             return [$etichetta => $gruppo->count()];
         });
 }
-public function ricalcolaDate($id)
+public function ricalcolaDate(int $id): void
 {
-    if (!isset($this->presidiData[$id]['data_serbatoio'])) return;
+    // lavora sulla mappa modifiche (presidiData) se presente, altrimenti su valori correnti del model
+    $row = $this->presidiData[$id] ?? [
+        'tipo_estintore_id' => $this->presidi->firstWhere('id', $id)?->tipo_estintore_id,
+        'data_serbatoio'    => $this->presidi->firstWhere('id', $id)?->data_serbatoio,
+        'data_acquisto'     => $this->presidi->firstWhere('id', $id)?->data_acquisto,
+        'scadenza_presidio' => $this->presidi->firstWhere('id', $id)?->scadenza_presidio,
+    ];
 
-    $presidio = Presidio::find($id);
-    $presidio->data_serbatoio = $this->presidiData[$id]['data_serbatoio'];
-    $presidio->tipo_estintore_id = $presidio->tipo_estintore_id ?? null;
-    $presidio->calcolaScadenze();
+    $tipoId   = $row['tipo_estintore_id'] ?? null;
+    $serb     = $row['data_serbatoio']    ?? null;
+    $acq      = $row['data_acquisto']     ?? null;
 
-    $this->presidiData[$id]['data_revisione'] = $presidio->data_revisione;
-    $this->presidiData[$id]['data_collaudo'] = $presidio->data_collaudo;
-    $this->presidiData[$id]['data_fine_vita'] = $presidio->data_fine_vita;
-    $this->presidiData[$id]['data_sostituzione'] = $presidio->data_sostituzione;
+    // se c’è acquisto e non c’è scadenza_presidio, calcolala qui (regola tua di business)
+    if ($acq && empty($row['scadenza_presidio'])) {
+        // es.: 10 anni dall’acquisto
+        $row['scadenza_presidio'] = \Carbon\Carbon::parse($acq)->addYears(10)->startOfMonth()->format('Y-m-d');
+    }
+
+    // se mancano tipo o serbatoio, azzero derivate
+    if (!$tipoId || !$serb) {
+        $row['data_revisione']    = null;
+        $row['data_collaudo']     = null;
+        $row['data_fine_vita']    = null;
+        $row['data_sostituzione'] = $row['scadenza_presidio'] ?? null;
+        $this->presidiData[$id]   = $row;
+        return;
+    }
+
+    $tipo   = \App\Models\TipoEstintore::with('classificazione')->find($tipoId);
+    $classi = $tipo?->classificazione;
+
+    $periodoRev    = \App\Livewire\Presidi\ImportaPresidi::pickPeriodoRevisione($serb, $classi);
+    $scadRevisione = \App\Livewire\Presidi\ImportaPresidi::nextDueAfter($serb, $periodoRev);
+    $scadCollaudo  = !empty($classi?->anni_collaudo)
+        ? \App\Livewire\Presidi\ImportaPresidi::nextDueAfter($serb, (int)$classi->anni_collaudo)
+        : null;
+    $fineVita      = \App\Livewire\Presidi\ImportaPresidi::addYears($serb, $classi?->anni_fine_vita);
+
+    // se hai i "mesi preferiti", allinea come già fatto nell’import (riusa lo stesso helper se l’hai messo qui)
+    if (method_exists($this, 'alignToPreferred')) {
+        $scadRevisione = $this->alignToPreferred($scadRevisione) ?: $scadRevisione;
+        $scadCollaudo  = $this->alignToPreferred($scadCollaudo)  ?: $scadCollaudo;
+    }
+
+    $row['data_revisione'] = $scadRevisione;
+    $row['data_collaudo']  = $scadCollaudo;
+    $row['data_fine_vita'] = $fineVita;
+
+    // sostituzione operativa = min tra scadenze assolute
+    $row['data_sostituzione'] = \App\Livewire\Presidi\ImportaPresidi::minDate(
+        $row['scadenza_presidio'] ?? null,
+        $row['data_fine_vita']    ?? null,
+        $row['data_collaudo']     ?? null,
+        $row['data_revisione']    ?? null,
+    );
+
+    $this->presidiData[$id] = $row;
 }
+
     
     public function selezionaCategoria($categoria)
     {
@@ -209,25 +294,47 @@ public function ricalcolaDate($id)
             'data_serbatoio' => $this->dataSerbatoio,
             'flag_preventivo' => $this->flagPreventivo,
             'descrizione' => $this->descrizione,
+               // NUOVI CAMPI (valorizzali solo se isAcquisto)
+        'data_acquisto'     => $this->isAcquisto ? $this->dataAcquisto : null,
+        'scadenza_presidio' => $this->isAcquisto ? $this->scadenzaPresidio : null,
+       
         ]);
         Log::info('PRE SALVA');
-        $presidio->save(); // <--- qui parte il booted() e il calcolo scadenze
-        Log::info('DOPO SALVA');
-        // Dopo il salvataggio, ricarico le relazioni e ricalcolo le date
+        $presidio->save();                  // trigger boot/calcolo scadenze del model
         $presidio->load('tipoEstintore.classificazione');
-        $presidio->calcolaScadenze();
+        $presidio->calcolaScadenze();       // revisione/collaudo/fine vita da data serbatoio
         $presidio->save();
-
+    
         session()->flash('message', 'Presidio creato con successo.');
-        Log::info('Pre - RESET');
-        // Reset dei soli campi di input
+    
+        // reset ONLY dei campi di form
         $this->reset([
-            'ubicazione', 'tipoContratto', 'tipoEstintore', 'dataSerbatoio',
-            'flagPreventivo', 'anomalia1', 'anomalia2', 'anomalia3',
-            'note', 'descrizione'
+            'ubicazione','tipoContratto','tipoEstintore','dataSerbatoio','flagPreventivo',
+            'anomalia1','anomalia2','anomalia3','note','descrizione',
+            'isAcquisto','dataAcquisto','scadenzaPresidio',
         ]);
         Log::info('Fine del metodo salvaPresidio');
     }
+    public function elimina(int $id): void
+    {
+        // Se stavi editando proprio questa riga, esci dall’edit
+        if ($this->presidioInModifica === $id) {
+            $this->presidioInModifica = null;
+        }
+        unset($this->presidiData[$id]);
+
+        $presidio = \App\Models\Presidio::find($id);
+        if (!$presidio) {
+            session()->flash('message', 'Presidio già rimosso o inesistente.');
+            return;
+        }
+
+        // Se hai relazioni con FK "restrict", valuta try/catch
+        $presidio->delete();
+
+        session()->flash('message', 'Presidio eliminato definitivamente.');
+    }
+
     public function salvaModifichePresidi()
     {
         foreach ($this->presidiData as $id => $dati) {
