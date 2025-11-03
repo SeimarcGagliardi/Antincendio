@@ -133,19 +133,43 @@ private function guessTipoEstintoreId(string $raw): ?int
 // === UTIL PER MESI PREFERITI
 private function caricaMesiPreferiti(int $clienteId): array
 {
-    $cli = \App\Models\Cliente::find($clienteId);
-    if (!$cli) return [];
-    $raw = $cli->mesi_intervento ?? $cli->mesi ?? null;
-    if (is_string($raw)) {
-        return collect(explode(',', $raw))->map(fn($m)=>(int)trim($m))
-            ->filter(fn($m)=>$m>=1 && $m<=12)->unique()->values()->all();
-    }
-    if (is_array($raw)) {
-        return collect($raw)->map(fn($m)=>(int)$m)
-            ->filter(fn($m)=>$m>=1 && $m<=12)->unique()->values()->all();
+    $cliente = \App\Models\Cliente::find($clienteId);
+    $sede    = $this->sedeId ? \App\Models\Sede::find($this->sedeId) : null;
+
+    $candidates = [
+        $sede?->mesi_visita ?? null,
+        $cliente?->mesi_visita ?? null,
+        $cliente?->mesi_intervento ?? null,
+        $cliente?->mesi ?? null,
+    ];
+    foreach ($candidates as $raw) {
+        $arr = $this->normalizeMonths($raw);
+        if (!empty($arr)) return $arr;
     }
     return [];
 }
+
+
+private function normalizeMonths($raw): array
+{
+    if (!$raw) return [];
+    if (is_string($raw)) {
+        $decoded = json_decode($raw, true);
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+            $raw = $decoded;
+        } else {
+            $raw = array_map('trim', explode(',', $raw));
+        }
+    }
+    if (is_array($raw)) {
+        return collect($raw)
+            ->map(fn($m)=>(int)$m)
+            ->filter(fn($m)=>$m>=1 && $m<=12)
+            ->unique()->sort()->values()->all();
+    }
+    return [];
+}
+
 
 private function alignToPreferred(?string $due): ?string
 {
@@ -195,26 +219,26 @@ private function ricalcolaDatePerRiga(array &$row): void
     $tipo = TipoEstintore::with('classificazione')->find($tipoId);
     $classi = $tipo?->classificazione;
 
-    $periodoRev    = self::pickPeriodoRevisione($dataSerb, $classi);
-    $scadRevisione = self::nextDueAfter($dataSerb, $periodoRev);
+    $periodoRev       = self::pickPeriodoRevisione($dataSerb, $classi);
+    $baseRevisione    = $row['data_ultima_revisione'] ?? $dataSerb;
+    $scadRevisione    = self::nextDueAfter($baseRevisione, $periodoRev);
+    
     $scadCollaudo  = !empty($classi?->anni_collaudo) ? self::nextDueAfter($dataSerb, (int)$classi->anni_collaudo) : null;
     $fineVita      = self::addYears($dataSerb, $classi?->anni_fine_vita);
 
     $row['data_revisione'] = $this->visitaOnOrBefore($scadRevisione) ?? $scadRevisione;
 
-    $row['data_collaudo']  = $this->alignToPreferred($scadCollaudo)  ?: $scadCollaudo;
-    $row['data_fine_vita'] = $fineVita;
+    $row['data_collaudo']  = $this->visitaOnOrBefore($scadCollaudo)  ?? $scadCollaudo;
+    $row['data_fine_vita'] = $this->visitaOnOrBefore($fineVita)      ?? $fineVita;
+    
 
     // “capolinea” per sostituzione = min scadenze + allineamento
     $scadenzaAssoluta = self::minDate(
-        $row['data_revisione'],
-        $row['data_collaudo'],
-        $row['data_fine_vita'],
-        $row['scadenza_presidio'] ?? null
+        $scadRevisione, $scadCollaudo, $fineVita, $row['scadenza_presidio'] ?? null
     );
-    $row['data_sostituzione'] = $this->alignToPreferred($scadenzaAssoluta);
-}
+    $row['data_sostituzione'] = $this->visitaOnOrBefore($scadenzaAssoluta);
 
+    }
 // === Azione chiamata da Blade quando cambi tipo o serbatoio
 public function ricalcola(string $scope, int $index): void
 {
@@ -498,9 +522,9 @@ public function ricalcola(string $scope, int $index): void
                    
                     
                     // scadenza “capolinea” per sostituzione (min di tutte le scadenze note)
-                    $scadenzaAssoluta = self::minDate($scadRevisione, $scadCollaudo, $fineVita, $scadPresidio);
                     // data operativa (mese prima, ma non prima di oggi) rispettando i mesi preferiti
-                    $dataSostituzione = $alignToPreferred($scadenzaAssoluta, $mesiPref);
+                    $scadenzaAssoluta = self::minDate($scadRevisione, $scadCollaudo, $fineVita, $scadPresidio);
+                    $dataSostituzione = $this->visitaOnOrBefore($scadenzaAssoluta); // <-- inclusiva
 
                     // anomalie (scan testo riga)
                     $joinedUp = mb_strtoupper(implode(' ', $vals));
@@ -515,14 +539,14 @@ public function ricalcola(string $scope, int $index): void
                         'tipo_contratto'    => $contratto,
                         'tipo_estintore'    => $tipoRaw,
                         'tipo_estintore_id' => $tipoEst?->id,
-
+                        
                         // NUOVI
                         'data_acquisto'     => $dataAcquisto,
                         'scadenza_presidio' => $scadPresidio,
 
                         // SERBATOIO-BASED
                         'data_serbatoio'    => $dataSerb,
-
+                        'data_ultima_revisione'  => $dataUltimaRevisione, 
                         // Scadenze “teoriche”
                         'data_revisione'    => $revAligned ?? $scadRevisione,
                         'data_collaudo'     => $colAligned ?? $scadCollaudo,

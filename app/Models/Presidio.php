@@ -91,6 +91,11 @@ class Presidio extends Model
     public function calcolaScadenze(): void
     {
         Log::info('[CALCOLO SCADENZE] Avvio per presidio ID ' . ($this->id ?? 'new'));
+        Log::info('[CALCOLO SCADENZE][INPUT]', [
+            'data_serbatoio'        => $this->data_serbatoio,
+            'data_ultima_revisione' => $this->data_ultima_revisione,
+            'mesi_visita'           => $this->getMesiVisita(),
+          ]);
 
         if (!$this->tipoEstintore || !$this->tipoEstintore->classificazione) {
             Log::warning('[CALCOLO SCADENZE] Tipo estintore o classificazione mancanti');
@@ -141,7 +146,7 @@ class Presidio extends Model
             $fineVita,
             $this->scadenza_presidio
         );
-        $this->data_sostituzione = $this->visitaPrimaDi($scadenzaAssoluta, $mesiVisita);
+        $this->data_sostituzione = $this->visitaOnOrBefore($scadenzaAssoluta, $mesiVisita);
 
         Log::info('[CALCOLO SCADENZE] OK', [
             'revisione' => $this->data_revisione,
@@ -149,6 +154,7 @@ class Presidio extends Model
             'fine_vita' => $this->data_fine_vita,
             'sostituz.' => $this->data_sostituzione,
         ]);
+                 
     }
 
     /**
