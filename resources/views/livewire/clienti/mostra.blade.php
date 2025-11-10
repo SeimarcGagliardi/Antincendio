@@ -142,7 +142,9 @@
             <button wire:click="salvaMesi" class="btn btn-xs btn-primary mt-2">💾 Salva mesi</button>
         @endif
     </div>
+</div>
 
+<div class="mt-6 space-y-6">
     {{-- DX: Fatturazione (sempre a destra da lg in su) --}}
     <div class="border-t pt-4">
         <h3 class="text-md font-semibold text-red-600 mb-2">Fatturazione</h3>
