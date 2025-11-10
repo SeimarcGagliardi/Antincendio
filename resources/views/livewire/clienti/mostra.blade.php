@@ -80,26 +80,31 @@
         </div>
     </div>
 
-    {{-- DX riga 5: NOTE (ripristinato) --}}
-    <div class="sm:col-start-2">
-        <div class="flex items-center justify-between">
-            <span class="font-semibold text-gray-700">Note</span>
-            <button class="btn btn-xs btn-warning" wire:click="$toggle('noteEdit')">✏️</button>
+    {{-- DX riga 5: NOTE (aggiornato) --}}
+<div class="sm:col-start-2">
+    <div class="flex items-center justify-between">
+        <span class="font-semibold text-gray-700">Note</span>
+        <button class="btn btn-xs btn-warning" wire:click="toggleNote">✏️</button>
         </div>
 
-        @if($noteEdit ?? false)
+            @if($noteEdit)
             <textarea
                 wire:model.defer="note"
                 rows="6"
                 class="textarea textarea-bordered w-full mt-2"
                 placeholder="Inserisci qui eventuali note operative..."></textarea>
-            <button wire:click="salvaNote" class="btn btn-primary btn-sm mt-2">💾 Salva note</button>
-        @else
-            <div class="mt-2 p-3 rounded border border-gray-200 bg-gray-50 min-h-[3rem]">
-                {{ $cliente->note ?: '—' }}
+
+            <div class="mt-2 flex gap-2">
+                <button wire:click="salvaNote" class="btn btn-primary btn-sm">💾 Salva note</button>
+                <button wire:click="toggleNote" class="btn btn-ghost btn-sm">Annulla</button>
             </div>
+            @else
+            <div class="mt-2 p-3 rounded border border-gray-200 bg-gray-50 min-h-[3rem]">
+            {{ $cliente->note ?: '—' }}
+        </div>
         @endif
     </div>
+
 </div>
 
 
