@@ -40,6 +40,38 @@
                 </div>
             </div>
         </div>
+        <div class="mt-6 border-t pt-4">
+            <h3 class="text-md font-semibold text-red-600 mb-2">Note</h3>
+
+            <label class="block text-sm text-gray-700 mb-1">
+                Annotazioni interne sul cliente 
+            </label>
+
+            <textarea
+                wire:model.defer="note"
+                rows="5"
+                class="textarea textarea-bordered w-full"
+                placeholder="Inserisci qui eventuali note operative..."></textarea>
+
+            @error('note')
+                <p class="text-xs text-red-600 mt-1">{{ $message }}</p>
+            @enderror
+
+            <div class="mt-2 flex items-center justify-between text-xs text-gray-500">
+                <span>
+                    @if($cliente->note)
+                        Ultimo valore salvato mostrato sopra.
+                    @else
+                        Nessuna nota salvata.
+                    @endif
+                </span>
+                <span>{{ strlen($note ?? '') }}/5000</span>
+            </div>
+
+            <button wire:click="salvaNote" class="btn btn-primary mt-3">
+                💾 Salva note
+            </button>
+        </div>
 
         <div class="mt-4">
             <button wire:click="vaiAiPresidi" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition">
@@ -55,17 +87,72 @@
             </span>
                 <button wire:click="toggleMesiVisibili('cliente')" class="btn btn-sm btn-warning">✏️ Mesi</button>
             </div>
-            @if($modificaMesiVisibile['cliente'] ?? false)
-                <div class="grid grid-cols-6 gap-2 mt-2">
-                    @for($i = 1; $i <= 12; $i++)
-                        <label class="inline-flex items-center">
-                            <input type="checkbox" wire:model.defer="modificaMesi.cliente.{{ str_pad($i, 2, '0', STR_PAD_LEFT) }}" class="mr-1">
-                            {{ Date::create()->month($i)->format('M') }}
-                        </label>
-                    @endfor
+            {{-- ... blocco mesi cliente già presente ... --}}
+
+@if($modificaMesiVisibile['cliente'] ?? false)
+    <div class="grid grid-cols-6 gap-2 mt-2">
+        @for($i = 1; $i <= 12; $i++)
+            <label class="inline-flex items-center">
+                <input type="checkbox"
+                       wire:model.live="modificaMesi.cliente.{{ str_pad($i, 2, '0', STR_PAD_LEFT) }}"
+                       class="mr-1">
+                {{ Date::create()->month($i)->format('M') }}
+            </label>
+        @endfor
+    </div>
+
+    <div class="flex items-center gap-2 mt-2">
+        <button wire:click="salvaMesi" class="btn btn-xs btn-primary">💾 Salva mesi</button>
+    </div>
+@endif
+    {{-- 🔽 NEW: mostra i campi minuti solo se c'è almeno 1 mese selezionato --}}
+    @if (!empty($mesiClienteSelezionati))
+        <div class="mt-4 p-3 bg-gray-50 rounded border">
+            <h4 class="text-sm font-semibold mb-2">Minuti per visita</h4>
+
+            {{-- Etichetta dinamica in base al mese selezionato --}}
+            @php
+                $mese1 = $mesiClienteSelezionati[0] ?? null;   // es. 3
+                $mese2 = $mesiClienteSelezionati[1] ?? null;   // es. 9
+            @endphp
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs text-gray-600">
+                        Minuti 1ª visita
+                        @if($mese1)
+                            ({{ Date::create()->month($mese1)->format('F') }})
+                        @endif
+                    </label>
+                    <input type="number" min="0" max="1440"
+                           wire:model.defer="minuti_mese1"
+                           class="input input-bordered w-full mt-1"
+                           placeholder="Es. 60">
+                    @error('minuti_mese1') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                 </div>
-                <button wire:click="salvaMesi" class="btn btn-xs btn-primary mt-2">💾 Salva mesi</button>
-            @endif
+
+                @if($mese2)
+                    <div>
+                        <label class="block text-xs text-gray-600">
+                            Minuti 2ª visita
+                            ({{ Date::create()->month($mese2)->format('F') }})
+                        </label>
+                        <input type="number" min="0" max="1440"
+                               wire:model.defer="minuti_mese2"
+                               class="input input-bordered w-full mt-1"
+                               placeholder="Es. 45">
+                        @error('minuti_mese2') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
+                    </div>
+                @endif
+            </div>
+
+            <button wire:click="salvaMinutiCliente" class="btn btn-sm btn-success mt-3">
+                💾 Salva minuti visita
+            </button>
+        </div>
+    @endif
+
+
         </div>
         <div class="mt-6 border-t pt-4">
             <h3 class="text-md font-semibold text-red-600 mb-2">Fatturazione</h3>
@@ -134,7 +221,7 @@
                                 <div class="grid grid-cols-6 gap-2 mt-2">
                                     @for($i = 1; $i <= 12; $i++)
                                         <label class="inline-flex items-center">
-                                            <input type="checkbox" wire:model.defer="modificaMesi.{{ $sede->id }}.{{ str_pad($i, 2, '0', STR_PAD_LEFT) }}" class="mr-1">
+                                            <input type="checkbox" wire:model.live="modificaMesi.{{ $sede->id }}.{{ str_pad($i, 2, '0', STR_PAD_LEFT) }}" class="mr-1">
                                             {{ Date::create()->month($i)->format('M') }}
                                         </label>
                                     @endfor

@@ -1,5 +1,5 @@
-<?php
 
+/*
 use Carbon\Carbon;
 use App\Models\ClassificazioneEstintore;
 
@@ -13,7 +13,7 @@ use App\Models\ClassificazioneEstintore;
  *
  * Ritorna SEMPRE stringhe 'Y-m-d' o null.
  */
-function calcolaDatePresidio(
+/*function calcolaDatePresidio(
     ?Carbon $dataSerbatoio,
     ClassificazioneEstintore $classificazione,
     ?Carbon $dataUltimaRevisione = null,
@@ -74,7 +74,7 @@ function calcolaDatePresidio(
 }
 
 /* ========= Helper interni coerenti con Model/Import ========= */
-
+/*
 function nextDueAfterCarbon(?Carbon $start, ?int $periodYears, ?Carbon $today = null): ?Carbon
 {
     if (!$start || !$periodYears || $periodYears <= 0) return null;
@@ -89,7 +89,7 @@ function nextDueAfterCarbon(?Carbon $start, ?int $periodYears, ?Carbon $today = 
 
 /**
  * Inclusivo: se il mese della scadenza è nei mesi visita, usa quello; altrimenti il precedente.
- */
+ *//*
 function visitaOnOrBeforeCarbon(?Carbon $due, array $mesiVisita): ?Carbon
 {
     if (!$due) return null;

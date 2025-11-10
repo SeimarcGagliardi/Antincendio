@@ -51,18 +51,24 @@ class Index extends Component
         if ($this->searchReady && strlen(trim($this->search)) >= 3) {
             $raw  = trim($this->search);
             $like = "%{$raw}%";
-
-            $query->where(function ($q) use ($like, $raw) {
+        
+            $query->where(function ($q) use ($raw, $like) {
                 $q->where('nome', 'like', $like)
-                ->orWhere('p_iva', 'like', $like)
-                ->orWhere('email', 'like', $like)
-                ->orWhere('telefono', 'like', $like)
-                ->orWhere('indirizzo', 'like', $like)
-                ->orWhere('cap', 'like', $like)
-                ->orWhere('citta', 'like', $like)
-                ->orWhere('provincia', 'like', $like)
-                // <-- qui la ricerca anche su codice_esterno
-                ->orWhere('codice_esterno', 'like', ctype_digit($raw) ? "{$raw}%" : $like);
+                  ->orWhere('p_iva', 'like', $like)
+                  ->orWhere('email', 'like', $like)
+                  ->orWhere('telefono', 'like', $like)
+                  ->orWhere('indirizzo', 'like', $like)
+                  ->orWhere('cap', 'like', $like)
+                  ->orWhere('citta', 'like', $like)
+                  ->orWhere('provincia', 'like', $like);
+        
+                // --- FIX per codice_esterno (copre INT e VARCHAR) ---
+                if (ctype_digit($raw)) {
+                    // match più veloce quando cerchi numeri
+                    $q->orWhereRaw('CAST(codice_esterno AS CHAR) LIKE ?', ["{$raw}%"]);
+                }
+                // match generico
+                $q->orWhereRaw('CAST(codice_esterno AS CHAR) LIKE ?', [$like]);
             });
         }
 
