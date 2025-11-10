@@ -45,10 +45,10 @@
                      x-on:click.outside="open=false"
                      class="absolute z-10 mt-1 w-56 max-h-64 overflow-auto rounded-md border bg-white shadow">
 
-                  {{-- Nessuno --}}
+                     {{-- Nessuno --}}
                   <button type="button"
                           class="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-50"
-                          wire:click="setColore({{ $t->id }}, null)"
+                          wire:click="setColore({{ $t->id }}, {{ json_encode(null) }})"
                           x-on:click="open=false">
                     <span class="inline-block w-4 h-4 rounded-full ring-1 ring-black/10 bg-gray-300"></span>
                     <span>— nessuno —</span>
@@ -59,7 +59,7 @@
                   @foreach($colori as $c)
                     <button type="button"
                             class="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-50"
-                            wire:click="setColore({{ $t->id }}, {{ $c->id }})"
+                            wire:click="setColore({{ $t->id }}, {{ json_encode($c->id) }})"
                             x-on:click="open=false">
                       <span class="inline-block w-4 h-4 rounded-full ring-1 ring-black/10"
                             style="background-color: {{ $c->hex ?? '#9CA3AF' }}"></span>

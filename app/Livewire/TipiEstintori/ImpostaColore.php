@@ -42,9 +42,10 @@ class ImpostaColore extends Component
         }
     }
 
-    public function setColore(int $tipoId, ?int $coloreId): void
+    public function setColore($tipoId, $coloreId = null): void
     {
-        $coloreId = $coloreId ?: null;
+        $tipoId   = (int) $tipoId;
+        $coloreId = $coloreId === null ? null : (int) $coloreId;
 
         // aggiorna DB
         $tipo = TipoEstintore::find($tipoId);
@@ -54,8 +55,8 @@ class ImpostaColore extends Component
         $tipo->save();
 
         // aggiorna stato UI
-        $this->selezioni[$tipoId] = $coloreId;
-        $this->originali[$tipoId] = $coloreId;
+        $this->selezioni[$tipoId]  = $coloreId;
+        $this->originali[$tipoId]  = $coloreId;
 
         // sync nella collection mostrata
         $this->tipi = $this->tipi->map(function ($x) use ($tipoId, $coloreId) {
@@ -68,7 +69,8 @@ class ImpostaColore extends Component
             return $x;
         });
 
-        $this->dispatch('notify', body: 'Colore aggiornato');
+
+        //$this->dispatch('notify', body: 'Colore aggiornato');
     }
 
     public function render()
