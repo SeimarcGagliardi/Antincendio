@@ -14,24 +14,24 @@
         @endif
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-    {{-- SX --}}
+    {{-- SX riga 1 --}}
     <div>
         <span class="font-semibold text-gray-700">Codice esterno:</span>
         <div class="text-gray-900">{{ $cliente->codice_esterno }}</div>
     </div>
-
-    {{-- DX --}}
+    {{-- DX riga 1 --}}
     <div>
         <span class="font-semibold text-gray-700">Partita IVA:</span>
         <div class="text-gray-900">{{ $cliente->p_iva ?? '—' }}</div>
     </div>
 
+    {{-- full riga 2 --}}
     <div class="sm:col-span-2">
         <span class="font-semibold text-gray-700">Ragione sociale:</span>
         <div class="text-gray-900">{{ $cliente->nome }}</div>
     </div>
 
-    {{-- SX --}}
+    {{-- SX riga 3 --}}
     <div>
         <span class="font-semibold text-gray-700">Telefono:</span>
         <div>
@@ -45,21 +45,7 @@
         </div>
     </div>
 
-    {{-- DX --}}
-    <div>
-        <span class="font-semibold text-gray-700">Email:</span>
-        <div>
-            @if ($cliente->email)
-                <a href="mailto:{{ $cliente->email }}" class="text-red-600 hover:underline">
-                    <i class="fa fa-envelope mr-1"></i>{{ $cliente->email }}
-                </a>
-            @else
-                <span class="text-gray-500">—</span>
-            @endif
-        </div>
-    </div>
-
-    {{-- DX (nuovo blocco, resta nella colonna destra mantenendo le 2 colonne) --}}
+    {{-- DX riga 3: ZONA (tra P.IVA ed Email) --}}
     <div class="sm:col-start-2">
         <label class="font-semibold text-gray-700">Zona</label>
         <div class="mt-1 flex items-center gap-2">
@@ -73,20 +59,49 @@
                     <option value="{{ $z }}"></option>
                 @endforeach
             </datalist>
-
-            <button wire:click="salvaZona" class="btn btn-primary btn-sm">
-                💾 Salva
-            </button>
+            <button wire:click="salvaZona" class="btn btn-primary btn-sm">💾 Salva</button>
         </div>
-
-        {{-- opzionale: mostrina stato attuale --}}
         <div class="text-xs text-gray-500 mt-1">
             Attuale: <span class="font-medium">{{ $cliente->zona ?? '—' }}</span>
         </div>
-        {{-- opzionale: nota comportamento sedi --}}
-        {{-- <div class="text-[11px] text-gray-400 mt-0.5">Compila anche le sedi con zona vuota.</div> --}}
+    </div>
+
+    {{-- DX riga 4: EMAIL --}}
+    <div class="sm:col-start-2">
+        <span class="font-semibold text-gray-700">Email:</span>
+        <div>
+            @if ($cliente->email)
+                <a href="mailto:{{ $cliente->email }}" class="text-red-600 hover:underline">
+                    <i class="fa fa-envelope mr-1"></i>{{ $cliente->email }}
+                </a>
+            @else
+                <span class="text-gray-500">—</span>
+            @endif
+        </div>
+    </div>
+
+    {{-- DX riga 5: NOTE (ripristinato) --}}
+    <div class="sm:col-start-2">
+        <div class="flex items-center justify-between">
+            <span class="font-semibold text-gray-700">Note</span>
+            <button class="btn btn-xs btn-warning" wire:click="$toggle('noteEdit')">✏️</button>
+        </div>
+
+        @if($noteEdit ?? false)
+            <textarea
+                wire:model.defer="note"
+                rows="6"
+                class="textarea textarea-bordered w-full mt-2"
+                placeholder="Inserisci qui eventuali note operative..."></textarea>
+            <button wire:click="salvaNote" class="btn btn-primary btn-sm mt-2">💾 Salva note</button>
+        @else
+            <div class="mt-2 p-3 rounded border border-gray-200 bg-gray-50 min-h-[3rem]">
+                {{ $cliente->note ?: '—' }}
+            </div>
+        @endif
     </div>
 </div>
+
 
 
         <div class="mt-4">
