@@ -4,22 +4,19 @@ namespace App\Livewire\TipiEstintori;
 
 use Livewire\Component;
 use App\Models\{TipoEstintore, Colore};
+use Illuminate\Support\Collection;
 
 class ImpostaColore extends Component
 {
-    /** tipo_id => colore_id selezionato (in editing) */
     public array $selezioni = [];
-
-    /** tipo_id => colore_id originale (per dirty check) */
     public array $originali = [];
 
-    public $colori; // collection
-    public $tipi;   // collection
+    /** @var Collection */
+    public $colori;
+    /** @var Collection */
+    public $tipi;
 
-    /** colore_id => hex */
     public array $hexById = [];
-
-    /** colore_id => nome */
     public array $nomeById = [];
 
     public function mount(): void
@@ -32,59 +29,37 @@ class ImpostaColore extends Component
             ->orderBy('tipo')->orderBy('kg')->get();
 
         foreach ($this->tipi as $t) {
-            $this->selezioni[$t->id] = $t->colore_id;   // stato corrente
-            $this->originali[$t->id] = $t->colore_id;   // originale
+            $this->selezioni[$t->id] = $t->colore_id;
+            $this->originali[$t->id] = $t->colore_id;
         }
     }
 
-    /** Set immediato (anteprima) del colore selezionato per una riga */
+    /** Salva subito e aggiorna la UI */
     public function setColore(int $tipoId, ?int $coloreId): void
     {
-        $this->selezioni[$tipoId] = $coloreId ?: null;
-    }
+        // debug: controlla nei log se viene richiamato
+        logger('[ImpostaColore] setColore', ['tipoId' => $tipoId, 'coloreId' => $coloreId]);
 
-    /** Id modificati (confronto int per evitare mismatch "1" vs 1) */
-    public function getChangedIdsProperty(): array
-    {
-        $changed = [];
-        foreach ($this->selezioni as $id => $val) {
-            $new = $val !== null ? (int)$val : null;
-            $old = isset($this->originali[$id]) ? (int)$this->originali[$id] : null;
-            if ($new !== $old) $changed[] = (int)$id;
-        }
-        return $changed;
-    }
+        $coloreId = $coloreId ?: null;
+        $this->selezioni[$tipoId] = $coloreId;
 
-    public function salva(): void
-    {
-        $changed = $this->changedIds;
-        if (!$changed) {
-            session()->flash('message', 'Nessuna modifica da salvare');
-            return;
-        }
-
-        foreach ($changed as $id) {
-            // niente mass-assignment: aggiorniamo a mano e salviamo
-            $tipo = TipoEstintore::find($id);
-            if (!$tipo) continue;
-            $tipo->colore_id = $this->selezioni[$id] ?: null;
+        if ($tipo = TipoEstintore::find($tipoId)) {
+            $tipo->colore_id = $coloreId;
             $tipo->save();
+
+            // aggiorna la collection in memoria
+            $idx = $this->tipi->search(fn ($x) => (int)$x->id === (int)$tipoId);
+            if ($idx !== false) {
+                $t = $this->tipi[$idx];
+                $t->colore_id = $coloreId;
+                $t->setRelation('colore', $coloreId ? $this->colori->firstWhere('id', $coloreId) : null);
+                $this->tipi[$idx] = $t;
+            }
         }
 
-        // ricarica dati e azzera dirty
-        $this->tipi = TipoEstintore::with('colore')
-            ->orderBy('tipo')->orderBy('kg')->get();
-
-        foreach ($this->tipi as $t) {
-            $this->originali[$t->id] = $this->selezioni[$t->id] = $t->colore_id;
-        }
-
-        session()->flash('message', 'Colori salvati correttamente');
-    }
-
-    public function resetModifiche(): void
-    {
-        $this->selezioni = $this->originali;
+        $this->originali[$tipoId] = $coloreId;
+        // opzionale: piccolo feedback
+         $this->dispatch('notify', body: 'Colore aggiornato');
     }
 
     public function render()
