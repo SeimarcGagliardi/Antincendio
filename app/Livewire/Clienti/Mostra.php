@@ -6,8 +6,6 @@ use App\Models\Cliente;
 use App\Models\Sede;
 use Livewire\Component;
 use Illuminate\Support\Str;
-public bool $noteEdit = false;
-public ?string $note = null;
 
 class Mostra extends Component
 {
@@ -18,6 +16,8 @@ class Mostra extends Component
 
     public $fatturazione_tipo;
     public $mese_fatturazione;
+    public bool $noteEdit = false;
+    public ?string $note = null;
 
     // ---- ZONA
     public string $zonaInput = '';
