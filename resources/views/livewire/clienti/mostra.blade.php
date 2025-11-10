@@ -115,9 +115,6 @@
         {{-- ===== sotto le NOTE ===== --}}
 <div class="mt-6 space-y-6">
 
-    {{-- RIGA 1: Mesi visita + Fatturazione (due card affiancate) --}}
-    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
-
        {{-- RIGA: Mesi visita (sx) + Fatturazione (dx) --}}
 <div class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
 
