@@ -6,6 +6,8 @@ use App\Models\Cliente;
 use App\Models\Sede;
 use Livewire\Component;
 use Illuminate\Support\Str;
+public bool $noteEdit = false;
+public ?string $note = null;
 
 class Mostra extends Component
 {
@@ -23,6 +25,7 @@ class Mostra extends Component
 
     public function mount(Cliente $cliente)
     {
+        $this->note = $this->cliente->note; // valore iniziale
         $this->cliente = $cliente->load([
             'sedi.interventi' => fn($q) => $q->whereNotNull('durata_effettiva'),
         ]);
@@ -183,4 +186,21 @@ class Mostra extends Component
                 : null,
         ])->layout('layouts.app', ['title' => 'Dettaglio Cliente']);
     }
+
+    public function toggleNote(): void
+    {
+        $this->noteEdit = !$this->noteEdit;
+        if ($this->noteEdit === true) {
+        $this->note = $this->cliente->note; // ricarico quello attuale
+        }
+    }
+
+    public function salvaNote(): void
+    {
+        $this->validate(['note' => 'nullable|string|max:5000']);
+        $this->cliente->update(['note' => $this->note]);
+        $this->noteEdit = false;
+        $this->dispatch('toast', type: 'success', message: 'Note salvate.');
+    }
+
 }
