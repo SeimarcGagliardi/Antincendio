@@ -39,6 +39,17 @@
                     @endif
                 </div>
             </div>
+            <div><span class="font-semibold text-gray-700">Indirizzo:</span>
+                <div>
+                    @if ($cliente->indirizzo)
+                        <a href="https://www.google.com/maps/search/?api=1&query={{ urlencode($cliente->indirizzo . ', ' . $cliente->cap . ' ' . $cliente->citta . ' ' . $cliente->provincia) }}" target="_blank" class="text-red-600 hover:underline">
+                            <i class="fa fa-map-marker-alt mr-1"></i>
+                            {{ $cliente->indirizzo }} - {{ $cliente->cap }} {{ $cliente->citta }} ({{ $cliente->provincia }})
+                        </a>
+                    @else
+                        <span class="text-gray-500">—</span>
+                    @endif
+                </div>
         </div>
         <div class="mt-6 border-t pt-4">
             <h3 class="text-md font-semibold text-red-600 mb-2">Note</h3>
