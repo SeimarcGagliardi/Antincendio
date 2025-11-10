@@ -28,6 +28,7 @@ class Cliente extends Model
         'fatturazione_tipo',
         'mese_fatturazione',
         'note',
+        'zona',
     ];  
     protected $casts = [
         'mesi_visita' => 'array',
