@@ -19,4 +19,9 @@ class TipoEstintore extends Model
     {
         return $this->belongsTo(ClassificazioneEstintore::class, 'classificazione_id');
     }
+    // App\Models\TipoEstintore.php
+    public function colore() {
+        return $this->belongsTo(\App\Models\Colore::class);
+    }
+
 }

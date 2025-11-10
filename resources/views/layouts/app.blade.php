@@ -98,6 +98,11 @@
 
 
 <!-- /Toast ---------------------------------------------------------------->
+        @auth
+        @if(auth()->user()->ruoli()->where('nome','Admin')->exists())
+            @include('admin.partials.settings-modal')
+        @endif
+        @endauth
 
     @livewireScripts
     @stack('scripts')
