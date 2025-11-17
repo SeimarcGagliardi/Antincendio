@@ -157,6 +157,7 @@ class MsBusinessFatturaService
                     'mo_scont3' => 0,
                     'mo_codiva' => $codiva,
                     'mo_magaz' => 1,        // magazzino 1 di default
+                    'mo_datcons' => $tm_datdocSql,
                 ]);
 
                 $riga += 10;
