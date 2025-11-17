@@ -18,13 +18,8 @@
 
         {{-- Righe tipologie --}}
         @forelse ($tipi as $tipo)
-            @php
-                $selectedId = $coloriSelezionati[$tipo->id] ?? null;
-                $coloreSel  = $colori->firstWhere('id', $selectedId);
-                $hexSel     = $coloreSel->hex ?? '#111827'; // colore testo default (grigio scuro)
-            @endphp
+            
 
-<<<<<<< HEAD
             <div class="grid grid-cols-2 gap-4 items-center py-2 border-b last:border-b-0">
                 {{-- Colonna sinistra: nome tipo + pallina colore attuale --}}
                 <div class="text-sm text-gray-800 flex items-center space-x-2">
@@ -35,47 +30,13 @@
                         <span class="w-3 h-3 rounded-full border border-gray-300 bg-white"></span>
                     @endif
                     <span>{{ $tipo->descrizione }}</span>
-=======
-            {{-- Righe tipologie --}}
-            @forelse ($tipi as $tipo)
-                <div class="grid grid-cols-2 gap-4 items-center py-2 border-b last:border-b-0">
-                    {{-- Colonna sinistra: nome tipo + pallina colore attuale --}}
-                    <div class="text-sm text-gray-800 flex items-center space-x-2">
-                        @if ($tipo->colore)
-                            <span class="w-3 h-3 rounded-full border"
-                                  style="background-color: {{ $tipo->colore->hex }}"></span>
-                        @else
-                            <span class="w-3 h-3 rounded-full border border-gray-300 bg-white"></span>
-                        @endif
-                        <span>{{ $tipo->descrizione }}</span>
-                    </div>
-
-                    {{-- Colonna destra: select colore --}}
-                    <div>
-                        <select
-                            class="border-gray-300 rounded w-full text-sm"
-                            wire:change="salva({{ $tipo->id }}, $event.target.value)"
-                        >
-                            <option value="">— Nessun colore —</option>
-
-                            @foreach ($colori as $colore)
-                                <option
-                                    value="{{ $colore->id }}"
-                                    style="color: {{ $colore->hex }};"
-                                >
-                                    &#9679; {{ $colore->nome }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
->>>>>>> ec811cd4cee747b1f7aa6de8a1cbb29c7a3cbbb7
                 </div>
 
                 {{-- Colonna destra: select colore --}}
                 <div>
                     <select
                         class="border-gray-300 rounded w-full text-sm"
-                        wire:model="coloriSelezionati.{{ $tipo->id }}"
+                        wire:change="salva({{ $tipo->id }}, $event.target.value)"
                         style="color: {{ $hexSel }};"
                     >
                         <option value="">— Nessun colore —</option>
@@ -97,15 +58,5 @@
             </p>
         @endforelse
 
-        {{-- Pulsante salva --}}
-        <div class="mt-4 flex justify-end">
-            <button
-                type="button"
-                wire:click="salva"
-                class="px-4 py-2 bg-red-600 text-white rounded shadow hover:bg-red-700 text-sm"
-            >
-                Salva modifiche
-            </button>
-        </div>
     </div>
 </div>

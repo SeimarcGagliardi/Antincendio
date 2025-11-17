@@ -8,18 +8,7 @@ use App\Models\Colore;
 
 class ImpostaColore extends Component
 {
-<<<<<<< HEAD
-    /** @var \Illuminate\Support\Collection|\App\Models\TipoEstintore[] */
-    public $tipi;
-
-    /** @var \Illuminate\Support\Collection|\App\Models\Colore[] */
-    public $colori;
-
-    /** @var array<int,int|null> [tipo_id => colore_id] */
-    public array $coloriSelezionati = [];
-=======
-    
->>>>>>> ec811cd4cee747b1f7aa6de8a1cbb29c7a3cbbb7
+   
 
     public function mount(): void
     {
@@ -28,38 +17,14 @@ class ImpostaColore extends Component
 
     protected function caricaDati(): void
     {
-        $this->tipi = TipoEstintore::with('colore')
-            ->orderBy('descrizione')
-            ->get();
-
-    
-
-        $this->coloriSelezionati = [];
-        foreach ($this->tipi as $tipo) {
-            $this->coloriSelezionati[$tipo->id] = $tipo->colore_id;
-        }
+        
     }
 
     public function salva($idTipo,$idColore): void
     {
-        if (empty($this->coloriSelezionati)) {
-            return;
-        }
-
-        // rileggo solo i tipi che stiamo gestendo
-        $tipi = TipoEstintore::whereIn('id', array_keys($this->coloriSelezionati))->get();
-
-        foreach ($tipi as $tipo) {
-            $coloreId = $this->coloriSelezionati[$tipo->id] ?? null;
-
-            if ($tipo->colore_id != $coloreId) {
-                $tipo->colore_id = $coloreId ?: null;
-                $tipo->save();
-            }
-        }
-
-        // ricarico tutto aggiornato
-        $this->caricaDati();
+        $tipo = TipoEstintore::findOrFail($idTipo);
+        $tipo->colore_id = $idColore;
+        $tipo->save();
 
         session()->flash('message', 'Colori aggiornati correttamente.');
     }
