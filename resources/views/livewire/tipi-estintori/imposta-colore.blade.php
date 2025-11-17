@@ -34,22 +34,13 @@
 
                 {{-- Colonna destra: select colore --}}
                 <div>
-                    <select
-                        class="border-gray-300 rounded w-full text-sm"
-                        wire:change="salva({{ $tipo->id }}, $event.target.value)"
-                        style="color: {{ $tipo->colore ? $tipo->colore->hex : 'inherit' }};"
-                    >
-                        <option value="">— Nessun colore —</option>
+                   @foreach ($colori as $colore)
+                    <button wire:click.prevent="salva({{ $tipo->id }}, {{$colore->id}})"> </button>
+                    
+                    @endforeach
+                    
+                    {{ $tipo->colore_id }}
 
-                        @foreach ($colori as $colore)
-                            <option
-                                value="{{ $colore->id }}"
-                                style="color: {{ $colore->hex }};"
-                            >
-                                &#9679; {{ $colore->nome }}
-                            </option>
-                        @endforeach
-                    </select>
                 </div>
             </div>
         @empty

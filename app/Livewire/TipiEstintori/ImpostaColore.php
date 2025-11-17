@@ -20,12 +20,12 @@ class ImpostaColore extends Component
         
     }
 
-    public function salva($idTipo,$idColore): void
+    public function salva($idTipo,$idColore)
     {
         $tipo = TipoEstintore::findOrFail($idTipo);
         $tipo->colore_id = $idColore;
         $tipo->save();
-
+        
         session()->flash('message', 'Colori aggiornati correttamente.');
     }
 
@@ -35,6 +35,7 @@ class ImpostaColore extends Component
         $tipi = TipoEstintore::with('colore')
             ->orderBy('descrizione')
             ->get();
+            
         return view('livewire.tipi-estintori.imposta-colore',['colori' => $colori, 'tipi' => $tipi]);
     }
 }
