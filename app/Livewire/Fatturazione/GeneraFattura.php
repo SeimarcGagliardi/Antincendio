@@ -90,6 +90,7 @@ class GeneraFattura extends Component
             })
             ->orderBy('nome')
             ->get();
+            
         return view('livewire.fatturazione.genera-fattura', [
             'clienti' => $clienti,
         ])->layout('layouts.app');
