@@ -1,73 +1,54 @@
-<div class="space-y-4">
-  <h2 class="text-xl font-semibold">Colore per tipologia estintore</h2>
+{{-- resources/views/clienti/imposta-colore.blade.php --}}
+@extends('layouts.app')
 
-  <div class="overflow-x-auto rounded-xl border bg-white">
-    <table class="min-w-full text-sm">
-      <thead class="bg-gray-50">
-        <tr>
-          <th class="px-3 py-2 text-left">Sigla</th>
-          <th class="px-3 py-2 text-left">Descrizione</th>
-          <th class="px-3 py-2 text-left">Tipo</th>
-          <th class="px-3 py-2 text-right">Kg</th>
-          <th class="px-3 py-2">Colore</th>
-        </tr>
-      </thead>
+@section('content')
+    <div class="max-w-5xl mx-auto py-6 space-y-6">
+        {{-- TITOLO / BREADCRUMB / ECC. --}}
+        <div class="flex items-center justify-between">
+            <h1 class="text-2xl font-semibold text-gray-800">
+                Imposta colore cliente
+            </h1>
 
-      <tbody class="divide-y">
-        @foreach($tipi as $t)
-          @php
-            $hex  = optional($t->colore)->hex  ?? '#9CA3AF';
-            $nome = optional($t->colore)->nome ?? '—';
-          @endphp
+            <a href="{{ route('clienti.index') }}"
+               class="text-sm text-gray-500 hover:text-red-600">
+                ← Torna all'elenco clienti
+            </a>
+        </div>
 
-          <tr wire:key="tipo-{{ $t->id }}" style="border-left: 6px solid {{ $hex }};">
-            <td class="px-3 py-2 font-mono">{{ $t->sigla }}</td>
-            <td class="px-3 py-2">{{ $t->descrizione }}</td>
-            <td class="px-3 py-2">{{ $t->tipo }}</td>
-            <td class="px-3 py-2 text-right">{{ $t->kg }}</td>
+        {{-- QUI C'È IL TUO CONTENUTO ATTUALE --}}
+        <div class="bg-white shadow rounded-lg p-6">
+            {{-- Se usi un componente Livewire per questa pagina, ad esempio: --}}
+            @livewire('clienti.imposta-colore', ['cliente' => $cliente])
 
-            <td class="px-3 py-2">
-              <div class="relative" x-data="{ open:false }" wire:key="picker-{{ $t->id }}">
-                <button type="button"
-                        class="w-56 inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-gray-300 text-sm hover:bg-gray-50"
-                        @click="open = !open"
-                        @keydown.escape.window="open=false"
-                        :aria-expanded="open"
-                        aria-haspopup="listbox">
-                  <span class="inline-block w-4 h-4 rounded-full ring-1 ring-black/10"
-                        style="background-color: {{ $hex }}"></span>
-                  <span>{{ $nome }}</span>
-                </button>
+            {{-- Oppure qui ci metti pure il resto del codice Blade che hai già --}}
+        </div>
 
-                <div x-show="open" x-transition x-cloak
-                     @click.outside="open=false"
-                     class="absolute z-10 mt-1 w-56 max-h-64 overflow-auto rounded-md border bg-white shadow">
+        {{-- ========================================================= --}}
+        {{-- BLOCCHETTO DI TEST PER ALPINE                         --}}
+        {{-- ========================================================= --}}
+        <div 
+            x-data="{ open: false }"
+            class="mt-8 p-4 border border-dashed border-blue-400 rounded-lg bg-blue-50"
+        >
+            <p class="text-sm text-gray-700 mb-2">
+                Test Alpine: se Alpine funziona, cliccando il bottone qui sotto dovrebbe comparire / scomparire il box verde.
+            </p>
 
-                  {{-- Nessuno --}}
-                  <button type="button"
-                          class="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-50"
-                          @click="open=false; @this.call('clearColore', {{ $t->id }})">
-                    <span class="inline-block w-4 h-4 rounded-full ring-1 ring-black/10 bg-gray-300"></span>
-                    <span>— nessuno —</span>
-                  </button>
+            <button
+                type="button"
+                @click="open = !open"
+                class="px-3 py-1.5 text-sm font-medium rounded bg-blue-600 text-white hover:bg-blue-700"
+            >
+                Toggle Alpine
+            </button>
 
-                  <div class="border-t my-1"></div>
-
-                  @foreach($colori as $c)
-                    <button type="button"
-                            class="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-50"
-                            @click="open=false; @this.call('setColore', {{ $t->id }}, {{ $c->id }})">
-                      <span class="inline-block w-4 h-4 rounded-full ring-1 ring-black/10"
-                            style="background-color: {{ $c->hex }}"></span>
-                      <span>{{ $c->nome }}</span>
-                    </button>
-                  @endforeach
-                </div>
-              </div>
-            </td>
-          </tr>
-        @endforeach
-      </tbody>
-    </table>
-  </div>
-</div>
+            <div 
+                x-show="open"
+                x-transition
+                class="mt-3 px-3 py-2 rounded bg-green-100 text-green-800 text-sm"
+            >
+                ✅ Alpine sta funzionando su questa pagina.
+            </div>
+        </div>
+    </div>
+@endsection
