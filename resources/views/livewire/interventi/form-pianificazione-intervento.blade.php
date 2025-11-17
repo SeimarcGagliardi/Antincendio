@@ -46,13 +46,21 @@
 
                 {{-- Sede principale --}}
                 @if ($cliente->presidi->whereNull('sede_id')->isNotEmpty() && !$clienteEsistente && !$clienteEvasa)
-                    <div class="mb-2">
-                        <div class="font-bold text-sm">{{ $cliente->nome }}</div>
-                        <button wire:click="caricaDati({{ $cliente->id }}, null, '{{ $meseSelezionato }}', '{{ $annoSelezionato }}')"
-                            class="btn btn-xs btn-secondary mt-1">
-                            📍 Sede principale
-                        </button>
-                    </div>
+                <div class="mb-2">
+    <button
+        wire:click="caricaDati({{ $cliente->id }}, null, '{{ $meseSelezionato }}', '{{ $annoSelezionato }}')"
+        class="w-full text-left border rounded px-3 py-2 hover:bg-gray-50 transition
+               flex flex-col items-start"
+    >
+        <div class="font-bold text-sm text-gray-900">
+            {{ $cliente->nome }}
+        </div>
+        <div class="text-sm text-gray-700">
+            📍 Sede principale
+        </div>
+    </button>
+</div>
+
                 @endif
 
                 {{-- Sedi secondarie --}}
