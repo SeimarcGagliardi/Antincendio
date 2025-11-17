@@ -16,9 +16,8 @@
       <tbody class="divide-y">
         @foreach($tipi as $t)
           @php
-            $coloreId = $selezioni[$t->id] ?? null;
-            $hex  = $coloreId ? ($hexById[$coloreId]  ?? '#9CA3AF') : '#9CA3AF';
-            $nome = $coloreId ? ($nomeById[$coloreId] ?? '—')       : '—';
+            $hex  = optional($t->colore)->hex  ?? '#9CA3AF';
+            $nome = optional($t->colore)->nome ?? '—';
           @endphp
 
           <tr wire:key="tipo-{{ $t->id }}" style="border-left: 6px solid {{ $hex }};">
@@ -40,15 +39,14 @@
                   <span>{{ $nome }}</span>
                 </button>
 
-                <div x-show="open" x-transition
-                     x-cloak
+                <div x-show="open" x-transition x-cloak
                      x-on:click.outside="open=false"
                      class="absolute z-10 mt-1 w-56 max-h-64 overflow-auto rounded-md border bg-white shadow">
 
-                     {{-- Nessuno --}}
+                  {{-- Nessuno --}}
                   <button type="button"
                           class="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-50"
-                          wire:click="setColore({{ $t->id }}, {{ json_encode(null) }})"
+                          wire:click="clearColore({{ $t->id }})"
                           x-on:click="open=false">
                     <span class="inline-block w-4 h-4 rounded-full ring-1 ring-black/10 bg-gray-300"></span>
                     <span>— nessuno —</span>
@@ -59,10 +57,10 @@
                   @foreach($colori as $c)
                     <button type="button"
                             class="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-50"
-                            wire:click="setColore({{ $t->id }}, {{ json_encode($c->id) }})"
+                            wire:click="setColore({{ $t->id }}, {{ $c->id }})"
                             x-on:click="open=false">
                       <span class="inline-block w-4 h-4 rounded-full ring-1 ring-black/10"
-                            style="background-color: {{ $c->hex ?? '#9CA3AF' }}"></span>
+                            style="background-color: {{ $c->hex }}"></span>
                       <span>{{ $c->nome }}</span>
                     </button>
                   @endforeach
