@@ -1,5 +1,5 @@
 <div class="space-y-4">
-  <h2 class="text-xl font-semibold">Colore per tipologia estintore</h2>
+  <h2 class="text-xl font-semibold">Colore per tipologia estintore - 17.11.2025 13:49</h2>
 
   <div class="overflow-x-auto rounded-xl border">
     <table class="min-w-full text-sm">
