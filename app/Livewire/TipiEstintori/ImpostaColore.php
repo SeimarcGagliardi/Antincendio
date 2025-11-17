@@ -8,6 +8,7 @@ use App\Models\Colore;
 
 class ImpostaColore extends Component
 {
+<<<<<<< HEAD
     /** @var \Illuminate\Support\Collection|\App\Models\TipoEstintore[] */
     public $tipi;
 
@@ -16,6 +17,9 @@ class ImpostaColore extends Component
 
     /** @var array<int,int|null> [tipo_id => colore_id] */
     public array $coloriSelezionati = [];
+=======
+    
+>>>>>>> ec811cd4cee747b1f7aa6de8a1cbb29c7a3cbbb7
 
     public function mount(): void
     {
@@ -28,7 +32,7 @@ class ImpostaColore extends Component
             ->orderBy('descrizione')
             ->get();
 
-        $this->colori = Colore::orderBy('nome')->get();
+    
 
         $this->coloriSelezionati = [];
         foreach ($this->tipi as $tipo) {
@@ -36,7 +40,7 @@ class ImpostaColore extends Component
         }
     }
 
-    public function salva(): void
+    public function salva($idTipo,$idColore): void
     {
         if (empty($this->coloriSelezionati)) {
             return;
@@ -62,6 +66,10 @@ class ImpostaColore extends Component
 
     public function render()
     {
-        return view('livewire.tipi-estintori.imposta-colore');
+        $colori = Colore::orderBy('nome')->get();
+        $tipi = TipoEstintore::with('colore')
+            ->orderBy('descrizione')
+            ->get();
+        return view('livewire.tipi-estintori.imposta-colore',['colori' => $colori, 'tipi' => $tipi]);
     }
 }
