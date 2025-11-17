@@ -72,8 +72,26 @@ class GeneraFattura extends Component
 
     public function render()
     {
+         $clienti = Cliente::query()
+            ->where(function($q){
+                // include SEMPRE i semestrali; gli annuali solo se è il loro mese
+                $q->where('fatturazione_tipo','semestrale')
+                  ->orWhere(function($qq){
+                      $qq->where('fatturazione_tipo','annuale')
+                         ->whereNotNull('mese_fatturazione')
+                         ->where('mese_fatturazione', (int)$this->mese);
+                  });
+            })
+            ->whereHas('interventi', function($q){
+                $q->where('stato','completato')
+                  ->where('fatturato', false)
+                  ->whereMonth('data_intervento', (int)$this->mese)
+                  ->whereYear('data_intervento', (int)$this->anno);
+            })
+            ->orderBy('nome')
+            ->get();
         return view('livewire.fatturazione.genera-fattura', [
-            'clienti' => Cliente::orderBy('nome')->get(),
+            'clienti' => $clienti,
         ])->layout('layouts.app');
     }
 }
