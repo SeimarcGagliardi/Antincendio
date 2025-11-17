@@ -36,7 +36,7 @@
                     <div>
                         <select
                             class="border-gray-300 rounded w-full text-sm"
-                            wire:model.defer="coloriSelezionati.{{ $tipo->id }}"
+                            wire:change="salva({{ $tipo->id }}, $event.target.value)"
                         >
                             <option value="">— Nessun colore —</option>
 
