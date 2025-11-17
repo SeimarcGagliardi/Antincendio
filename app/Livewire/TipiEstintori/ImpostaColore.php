@@ -8,62 +8,65 @@ use App\Models\Colore;
 
 class ImpostaColore extends Component
 {
-    public $tipi;              // 👈 questa è la variabile usata nella Blade
+    /**
+     * Elenco tipologie di estintori
+     *
+     * @var \Illuminate\Support\Collection|\App\Models\TipoEstintore[]
+     */
+    public $tipi;
+
+    /**
+     * Elenco colori disponibili
+     *
+     * @var \Illuminate\Support\Collection|\App\Models\Colore[]
+     */
     public $colori;
 
-    public $selectedTipoId = null;
-    public $selectedColoreId = null;
+    /**
+     * Mappa [ tipo_id => colore_id ]
+     *
+     * @var array<int,int|null>
+     */
+    public $coloriSelezionati = [];
 
-    public function mount()
+    public function mount(): void
     {
-        $this->tipi   = TipoEstintore::with('colore')->orderBy('descrizione')->get();
+        // carica tipi e colori
+        $this->tipi   = TipoEstintore::with('colore')
+            ->orderBy('descrizione')
+            ->get();
+
         $this->colori = Colore::orderBy('nome')->get();
 
-        if ($this->tipi->isNotEmpty()) {
-            $this->selectedTipoId   = $this->tipi->first()->id;
-            $this->selectedColoreId = $this->tipi->first()->colore_id;
+        // inizializza la mappa [tipo_id => colore_id]
+        foreach ($this->tipi as $tipo) {
+            $this->coloriSelezionati[$tipo->id] = $tipo->colore_id;
         }
     }
 
-    public function selectTipo($id)
+    public function salva(): void
     {
-        $this->selectedTipoId = $id;
+        foreach ($this->tipi as $tipo) {
+            $coloreId = $this->coloriSelezionati[$tipo->id] ?? null;
 
-        $tipo = $this->tipi->firstWhere('id', $id);
-        $this->selectedColoreId = $tipo?->colore_id;
-    }
-
-    public function updatedSelectedColoreId()
-    {
-        $this->salvaColore();
-    }
-
-    public function salvaColore()
-    {
-        if (!$this->selectedTipoId) {
-            return;
+            if ($tipo->colore_id != $coloreId) {
+                $tipo->colore_id = $coloreId ?: null;
+                $tipo->save();
+            }
         }
 
-        $tipo = TipoEstintore::find($this->selectedTipoId);
-        if (!$tipo) {
-            return;
-        }
+        // ricarico l’elenco aggiornato con la relazione colore
+        $this->tipi = TipoEstintore::with('colore')
+            ->orderBy('descrizione')
+            ->get();
 
-        $tipo->colore_id = $this->selectedColoreId ?: null;
-        $tipo->save();
-
-        // ricarico la lista con le relazioni aggiornate
-        $this->tipi = TipoEstintore::with('colore')->orderBy('descrizione')->get();
-
-        session()->flash('message', 'Colore aggiornato correttamente.');
+        session()->flash('message', 'Colori aggiornati correttamente.');
     }
 
     public function render()
     {
-        return view('livewire.tipi-estintori.imposta-colore', [
-            // 👇 così siamo sicuri che la Blade abbia queste variabili
-            'tipi'    => $this->tipi,
-            'colori'  => $this->colori,
-        ]);
+        // le proprietà pubbliche ($tipi, $colori, $coloriSelezionati) sono
+        // automaticamente disponibili nella view
+        return view('livewire.tipi-estintori.imposta-colore');
     }
 }
