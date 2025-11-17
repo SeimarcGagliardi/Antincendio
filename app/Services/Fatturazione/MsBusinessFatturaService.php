@@ -138,7 +138,7 @@ class MsBusinessFatturaService
                 'td_caustra' => $causaleMag,
                 'td_codese'  => $ivaTestata ?? 0,
                 'td_magaz'   => 1,          // magazzino 1 di default
-                'td_codpag'  => $codPaga ?? 1, // codice pagamento, default 1 se assente
+                'td_codpaga'  => $codPaga ?? 1, // codice pagamento, default 1 se assente
             ]);
 
             // RIGHE ORDINE (movord)
