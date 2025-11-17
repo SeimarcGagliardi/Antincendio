@@ -21,11 +21,13 @@
             {{-- Righe tipologie --}}
             @forelse ($tipi as $tipo)
                 <div class="grid grid-cols-2 gap-4 items-center py-2 border-b last:border-b-0">
-                    {{-- Colonna sinistra: nome tipo --}}
+                    {{-- Colonna sinistra: nome tipo + pallina colore attuale --}}
                     <div class="text-sm text-gray-800 flex items-center space-x-2">
                         @if ($tipo->colore)
                             <span class="w-3 h-3 rounded-full border"
                                   style="background-color: {{ $tipo->colore->hex }}"></span>
+                        @else
+                            <span class="w-3 h-3 rounded-full border border-gray-300 bg-white"></span>
                         @endif
                         <span>{{ $tipo->descrizione }}</span>
                     </div>
@@ -39,8 +41,11 @@
                             <option value="">— Nessun colore —</option>
 
                             @foreach ($colori as $colore)
-                                <option value="{{ $colore->id }}">
-                                    {{ $colore->nome }} ({{ $colore->hex }})
+                                <option
+                                    value="{{ $colore->id }}"
+                                    style="color: {{ $colore->hex }};"
+                                >
+                                    &#9679; {{ $colore->nome }}
                                 </option>
                             @endforeach
                         </select>

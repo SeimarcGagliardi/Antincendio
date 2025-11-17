@@ -8,37 +8,23 @@ use App\Models\Colore;
 
 class ImpostaColore extends Component
 {
-    /**
-     * Elenco tipologie di estintori
-     *
-     * @var \Illuminate\Support\Collection|\App\Models\TipoEstintore[]
-     */
+    /** @var \Illuminate\Support\Collection|\App\Models\TipoEstintore[] */
     public $tipi;
 
-    /**
-     * Elenco colori disponibili
-     *
-     * @var \Illuminate\Support\Collection|\App\Models\Colore[]
-     */
+    /** @var \Illuminate\Support\Collection|\App\Models\Colore[] */
     public $colori;
 
-    /**
-     * Mappa [ tipo_id => colore_id ]
-     *
-     * @var array<int,int|null>
-     */
+    /** @var array<int,int|null> [tipo_id => colore_id] */
     public $coloriSelezionati = [];
 
     public function mount(): void
     {
-        // carica tipi e colori
-        $this->tipi   = TipoEstintore::with('colore')
+        $this->tipi = TipoEstintore::with('colore')
             ->orderBy('descrizione')
             ->get();
 
         $this->colori = Colore::orderBy('nome')->get();
 
-        // inizializza la mappa [tipo_id => colore_id]
         foreach ($this->tipi as $tipo) {
             $this->coloriSelezionati[$tipo->id] = $tipo->colore_id;
         }
@@ -46,16 +32,25 @@ class ImpostaColore extends Component
 
     public function salva(): void
     {
-        foreach ($this->tipi as $tipo) {
+        if (empty($this->coloriSelezionati)) {
+            return;
+        }
+
+        // rileggo solo i tipi interessati
+        $tipi = TipoEstintore::whereIn('id', array_keys($this->coloriSelezionati))
+            ->get();
+
+        foreach ($tipi as $tipo) {
             $coloreId = $this->coloriSelezionati[$tipo->id] ?? null;
 
+            // aggiorno solo se è cambiato
             if ($tipo->colore_id != $coloreId) {
                 $tipo->colore_id = $coloreId ?: null;
                 $tipo->save();
             }
         }
 
-        // ricarico l’elenco aggiornato con la relazione colore
+        // ricarico lista con relazione colore aggiornata
         $this->tipi = TipoEstintore::with('colore')
             ->orderBy('descrizione')
             ->get();
@@ -65,8 +60,6 @@ class ImpostaColore extends Component
 
     public function render()
     {
-        // le proprietà pubbliche ($tipi, $colori, $coloriSelezionati) sono
-        // automaticamente disponibili nella view
         return view('livewire.tipi-estintori.imposta-colore');
     }
 }
