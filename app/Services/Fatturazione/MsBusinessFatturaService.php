@@ -89,7 +89,7 @@ class MsBusinessFatturaService
             );
         }
 
-        $causaleMag = $tpbf->{self::COL_TPBF_CAUSALE};
+        $causaleMag = $tpbf->{self::COL_TPBF_CAUSALE} ?? '20'; // default 20 se assente
 
         // 3) Numero documento ORDINE (tipork R, serie P)
         $refs = $this->numeri->nextNumero('R', 'P', $anno); // to_tipork='R', to_serie='P'
