@@ -15,9 +15,14 @@ class ImpostaColore extends Component
     public $colori;
 
     /** @var array<int,int|null> [tipo_id => colore_id] */
-    public $coloriSelezionati = [];
+    public array $coloriSelezionati = [];
 
     public function mount(): void
+    {
+        $this->caricaDati();
+    }
+
+    protected function caricaDati(): void
     {
         $this->tipi = TipoEstintore::with('colore')
             ->orderBy('descrizione')
@@ -25,6 +30,7 @@ class ImpostaColore extends Component
 
         $this->colori = Colore::orderBy('nome')->get();
 
+        $this->coloriSelezionati = [];
         foreach ($this->tipi as $tipo) {
             $this->coloriSelezionati[$tipo->id] = $tipo->colore_id;
         }
@@ -36,24 +42,20 @@ class ImpostaColore extends Component
             return;
         }
 
-        // rileggo solo i tipi interessati
-        $tipi = TipoEstintore::whereIn('id', array_keys($this->coloriSelezionati))
-            ->get();
+        // rileggo solo i tipi che stiamo gestendo
+        $tipi = TipoEstintore::whereIn('id', array_keys($this->coloriSelezionati))->get();
 
         foreach ($tipi as $tipo) {
             $coloreId = $this->coloriSelezionati[$tipo->id] ?? null;
 
-            // aggiorno solo se è cambiato
             if ($tipo->colore_id != $coloreId) {
                 $tipo->colore_id = $coloreId ?: null;
                 $tipo->save();
             }
         }
 
-        // ricarico lista con relazione colore aggiornata
-        $this->tipi = TipoEstintore::with('colore')
-            ->orderBy('descrizione')
-            ->get();
+        // ricarico tutto aggiornato
+        $this->caricaDati();
 
         session()->flash('message', 'Colori aggiornati correttamente.');
     }
