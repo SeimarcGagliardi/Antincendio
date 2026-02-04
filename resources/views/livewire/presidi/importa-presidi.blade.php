@@ -144,10 +144,17 @@
 
                                 {{-- marca serbatoio --}}
                                 <td class="px-2 py-1">
-                                    <input type="text"
-                                        wire:model.defer="anteprima.{{ $r }}.marca_serbatoio"
-                                        wire:change="ricalcola('anteprima', {{ $r }})"
-                                        class="form-input w-20 text-xs">
+                                    <div class="flex items-center gap-2">
+                                        <input type="text"
+                                            wire:model.defer="anteprima.{{ $r }}.marca_serbatoio"
+                                            wire:change="ricalcola('anteprima', {{ $r }})"
+                                            class="form-input w-20 text-xs">
+                                        <button type="button"
+                                            wire:click="$set('anteprima.{{ $r }}.marca_serbatoio','MB')"
+                                            class="px-2 py-1 text-[10px] rounded bg-gray-200 hover:bg-gray-300">
+                                            MB
+                                        </button>
+                                    </div>
                                 </td>
 
 
@@ -365,10 +372,17 @@
 
                             {{-- marca serbatoio --}}
                             <td class="px-2 py-1">
-                                <input type="text"
-                                    wire:model.defer="presidiSalvati.{{ $i }}.marca_serbatoio"
-                                    wire:change="ricalcola('salvati', {{ $i }})"
-                                    class="form-input w-20 text-xs">
+                                <div class="flex items-center gap-2">
+                                    <input type="text"
+                                        wire:model.defer="presidiSalvati.{{ $i }}.marca_serbatoio"
+                                        wire:change="ricalcola('salvati', {{ $i }})"
+                                        class="form-input w-20 text-xs">
+                                    <button type="button"
+                                        wire:click="$set('presidiSalvati.{{ $i }}.marca_serbatoio','MB')"
+                                        class="px-2 py-1 text-[10px] rounded bg-gray-200 hover:bg-gray-300">
+                                        MB
+                                    </button>
+                                </div>
                             </td>
 
 
