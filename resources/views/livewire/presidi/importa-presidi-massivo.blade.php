@@ -2,7 +2,7 @@
     <div class="bg-white shadow rounded-lg p-6">
         <div class="flex items-center justify-between mb-4">
             <h2 class="text-xl font-semibold text-red-600">Import massivo presidi</h2>
-            <a href="{{ route('presidi.gestione', ['clienteId' => 1, 'sedeId' => 'principale']) }}"
+            <a href="{{ route('clienti.index') }}"
                class="text-sm text-gray-600 hover:text-red-600">
                 <i class="fa fa-arrow-left mr-1"></i> Torna a gestione presidi
             </a>
@@ -44,6 +44,7 @@
                             <th class="px-2 py-1">File</th>
                             <th class="px-2 py-1">Codice</th>
                             <th class="px-2 py-1">Cliente</th>
+                            <th class="px-2 py-1">Sede</th>
                             <th class="px-2 py-1">Stato</th>
                         </tr>
                     </thead>
@@ -53,6 +54,22 @@
                                 <td class="px-2 py-1">{{ $r['name'] }}</td>
                                 <td class="px-2 py-1">{{ $r['code4'] ?? '—' }}</td>
                                 <td class="px-2 py-1">{{ $r['cliente_nome'] ?? '—' }}</td>
+                                <td class="px-2 py-1">
+                                    @if(($r['status'] ?? '') === 'ok')
+                                        <select wire:model.defer="fileRows.{{ $r['index'] }}.sede_id"
+                                                class="input input-bordered text-xs">
+                                            @if(!empty($r['sedi']))
+                                                @foreach($r['sedi'] as $s)
+                                                    <option value="{{ $s['id'] }}">{{ $s['nome'] }}</option>
+                                                @endforeach
+                                            @else
+                                                <option value="auto">Sede principale (auto)</option>
+                                            @endif
+                                        </select>
+                                    @else
+                                        —
+                                    @endif
+                                </td>
                                 <td class="px-2 py-1">
                                     @if($r['status'] === 'ok')
                                         <span class="text-green-700">OK</span>

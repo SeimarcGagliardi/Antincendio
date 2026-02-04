@@ -4,6 +4,7 @@ namespace App\Livewire\Presidi;
 
 use App\Jobs\ImportPresidiDocxJob;
 use App\Models\Cliente;
+use App\Models\Sede;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
@@ -36,6 +37,10 @@ class ImportaPresidiMassivo extends Component
             if (!$last4) continue;
             $map[$last4][] = $c;
         }
+        $sediByCliente = Sede::query()
+            ->select('id','cliente_id','nome')
+            ->get()
+            ->groupBy('cliente_id');
 
         foreach ($this->files as $i => $file) {
             $name = $file->getClientOriginalName();
@@ -63,6 +68,12 @@ class ImportaPresidiMassivo extends Component
                 $cliente = $map[$code4][0];
                 $row['cliente_id'] = $cliente->id;
                 $row['cliente_nome'] = $cliente->nome;
+                $sedi = $sediByCliente->get($cliente->id, collect())
+                    ->map(fn($s) => ['id' => $s->id, 'nome' => $s->nome])
+                    ->values()
+                    ->all();
+                $row['sedi'] = $sedi;
+                $row['sede_id'] = count($sedi) ? $sedi[0]['id'] : 'auto';
 
                 $this->clientiInput[$cliente->id] = $this->clientiInput[$cliente->id] ?? [
                     'nome' => $cliente->nome,
@@ -99,6 +110,7 @@ class ImportaPresidiMassivo extends Component
     {
         foreach ($this->fileRows as $row) {
             if ($row['status'] !== 'ok') return false;
+            if (empty($row['sede_id'])) return false;
         }
         foreach ($this->clientiInput as $data) {
             $mesi = $data['mesi_visita'] ?? [];
@@ -121,7 +133,8 @@ class ImportaPresidiMassivo extends Component
             $file = $this->files[$row['index']] ?? null;
             if (!$file) continue;
             $path = $file->store('import_massivo', 'local');
-            ImportPresidiDocxJob::dispatch(storage_path('app/'.$path), (int)$row['cliente_id']);
+            $sedeId = $row['sede_id'] === 'auto' ? null : (int)$row['sede_id'];
+            ImportPresidiDocxJob::dispatch(storage_path('app/'.$path), (int)$row['cliente_id'], $sedeId);
         }
 
         $this->dispatch('toast', type: 'success', message: 'Import massivo avviato in coda.');
