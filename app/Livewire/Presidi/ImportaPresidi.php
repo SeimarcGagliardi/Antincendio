@@ -670,6 +670,7 @@ public function ricalcola(string $scope, int $index): void
         $this->caricaPresidiSalvati();    // refresh lista
         $this->selezionati = [];          // svuota check
         $this->dispatch('toast', type: 'success', message: 'Importazione completata');
+        $this->dispatch('presidi-updated');
     }
 
 

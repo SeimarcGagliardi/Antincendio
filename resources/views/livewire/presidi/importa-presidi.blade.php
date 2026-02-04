@@ -31,10 +31,17 @@
             $hasMissingAnteprima = collect($anteprima)->contains(function($r){
                 return empty($r['data_serbatoio'] ?? null) || empty($r['tipo_estintore_id'] ?? null);
             });
+            $anteprimaTot = count($anteprima);
+            $anteprimaMissing = collect($anteprima)->filter(function($r){
+                return empty($r['data_serbatoio'] ?? null) || empty($r['tipo_estintore_id'] ?? null);
+            })->count();
         @endphp
 
         <div class="mt-4">
             <h3 class="text-lg font-semibold mb-2">Anteprima presidi rilevati</h3>
+            <div class="mb-2 text-xs text-gray-600">
+                Totale: {{ $anteprimaTot }} | Mancanti: {{ $anteprimaMissing }} | Righe gialle: dati obbligatori mancanti
+            </div>
 
             <div class="overflow-x-auto border rounded shadow-sm">
                 <table class="min-w-full table-fixed text-sm text-left text-gray-800">
@@ -258,6 +265,10 @@
             if (!empty($filtroCategoria)) {
                 $rows = $rows->where('categoria', $filtroCategoria);
             }
+            $salvatiTot = $rows->count();
+            $salvatiMissing = $rows->filter(function($r){
+                return empty($r['data_serbatoio'] ?? null) || empty($r['tipo_estintore_id'] ?? null);
+            })->count();
             $showAcqS = $rows->contains(function($r){
                 return !empty($r['data_acquisto'] ?? null);
             });
@@ -267,6 +278,9 @@
         @endphp
 
         <div class="overflow-x-auto border rounded shadow-sm">
+            <div class="mb-2 text-xs text-gray-600 px-2 pt-2">
+                Totale: {{ $salvatiTot }} | Mancanti: {{ $salvatiMissing }} | Righe gialle: dati obbligatori mancanti
+            </div>
             <table class="min-w-full table-fixed text-sm text-left text-gray-800">
                 <colgroup>
                     <col style="width: 70px">   {{-- Prog. --}}

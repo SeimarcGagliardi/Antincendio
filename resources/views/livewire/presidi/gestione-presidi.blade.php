@@ -106,7 +106,7 @@
 
                 <tbody>
                     @foreach($presidi as $index => $presidio)
-                        <tr class="even:bg-gray-50 align-middle">
+                        <tr wire:key="presidio-{{ $presidio->id }}" class="even:bg-gray-50 align-middle">
                             {{-- # --}}
                             <td class="px-2 py-1 font-semibold text-center">{{ $presidio->progressivo }}</td>
 

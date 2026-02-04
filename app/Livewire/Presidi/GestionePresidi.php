@@ -34,6 +34,7 @@ class GestionePresidi extends Component
     public $sede;
     public $presidioInModifica = null;
     public $presidiData = [];
+    protected $listeners = ['presidi-updated' => '$refresh'];
 
     // === Nuovi campi per l'inserimento "in acquisto"
     public bool $isAcquisto = false;          // toggle "Estintore acquistato"
@@ -128,7 +129,8 @@ public function disattiva($id)
     $presidio->attivo = 0;
     $presidio->save();
 
-    $this->render();
+    $this->dispatch('toast', type: 'success', message: 'Presidio disattivato.');
+    $this->dispatch('$refresh');
 }
 public function salvaRiga($id)
 {
@@ -142,6 +144,8 @@ public function salvaRiga($id)
     $presidio->save();
     $this->presidioInModifica = null;
     session()->flash('message', 'Presidio aggiornato.');
+    $this->dispatch('toast', type: 'success', message: 'Presidio aggiornato.');
+    $this->dispatch('$refresh');
 }
 public function getRiepilogoTipiEstintoriProperty()
 {
@@ -320,6 +324,7 @@ public function ricalcolaDate(int $id): void
         $presidio->save();
     
         session()->flash('message', 'Presidio creato con successo.');
+        $this->dispatch('toast', type: 'success', message: 'Presidio creato con successo.');
     
         // reset ONLY dei campi di form
         $this->reset([
@@ -347,6 +352,8 @@ public function ricalcolaDate(int $id): void
         $presidio->delete();
 
         session()->flash('message', 'Presidio eliminato definitivamente.');
+        $this->dispatch('toast', type: 'success', message: 'Presidio eliminato definitivamente.');
+        $this->dispatch('$refresh');
     }
 
     public function salvaModifichePresidi()
@@ -383,6 +390,8 @@ public function ricalcolaDate(int $id): void
 
         $this->presidioInModifica = null;
         session()->flash('message', 'Presidi aggiornati con successo.');
+        $this->dispatch('toast', type: 'success', message: 'Presidi aggiornati con successo.');
+        $this->dispatch('$refresh');
     }
 
 
