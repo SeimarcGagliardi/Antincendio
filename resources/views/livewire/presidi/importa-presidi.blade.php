@@ -44,6 +44,14 @@
                     Totale: {{ $anteprimaTot }} | Mancanti: {{ $anteprimaMissing }} | Righe gialle: dati obbligatori mancanti
                 </div>
             </div>
+            @php
+                $anteprimaByCat = collect($anteprima)->groupBy('categoria')->map->count();
+            @endphp
+            <div class="mb-2 text-xs text-gray-600">
+                @foreach($anteprimaByCat as $cat => $count)
+                    <span class="inline-flex items-center px-2 py-0.5 rounded bg-gray-100 mr-2">{{ $cat }}: {{ $count }}</span>
+                @endforeach
+            </div>
 
             <div class="overflow-x-auto border rounded shadow-sm max-h-[60vh]">
                 <table class="min-w-full table-fixed text-sm text-left text-gray-800">
@@ -294,6 +302,14 @@
         <div class="overflow-x-auto border rounded shadow-sm max-h-[70vh]">
             <div class="mb-2 text-xs text-gray-600 px-2 pt-2">
                 Totale: {{ $salvatiTot }} | Mancanti: {{ $salvatiMissing }} | Righe gialle: dati obbligatori mancanti
+            </div>
+            @php
+                $salvatiByCat = $rows->groupBy('categoria')->map->count();
+            @endphp
+            <div class="mb-2 text-xs text-gray-600 px-2">
+                @foreach($salvatiByCat as $cat => $count)
+                    <span class="inline-flex items-center px-2 py-0.5 rounded bg-gray-100 mr-2">{{ $cat }}: {{ $count }}</span>
+                @endforeach
             </div>
             <table class="min-w-full table-fixed text-sm text-left text-gray-800">
                 <colgroup>
