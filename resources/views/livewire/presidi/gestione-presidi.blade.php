@@ -43,6 +43,12 @@
         </div>
     </div>
 
+    <div class="mb-3 flex flex-wrap items-center gap-2 text-xs text-gray-600">
+        <span class="px-2 py-1 rounded bg-gray-100">Categoria: {{ $categoriaAttiva }}</span>
+        <span class="px-2 py-1 rounded bg-gray-100">Totale: {{ $presidi->count() }}</span>
+        <span class="px-2 py-1 rounded bg-gray-100">Legenda: <span class="font-semibold">MB</span> = marca serbatoio</span>
+    </div>
+
     {{-- =================== LISTA PRESIDI =================== --}}
     @if($presidi->isEmpty())
         <div class="text-gray-500 italic">Nessun presidio registrato per questa categoria.</div>
@@ -106,7 +112,7 @@
 
                 <tbody>
                     @foreach($presidi as $index => $presidio)
-                        <tr wire:key="presidio-{{ $presidio->id }}" class="even:bg-gray-50 align-middle">
+                        <tr wire:key="presidio-{{ $presidio->id }}" class="even:bg-gray-50 align-middle {{ $presidio->id === $presidioInModifica ? 'bg-yellow-50' : '' }}">
                             {{-- # --}}
                             <td class="px-2 py-1 font-semibold text-center">{{ $presidio->progressivo }}</td>
 

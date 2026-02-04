@@ -170,10 +170,17 @@ private function normalizeMonths($raw): array
     return [];
 }
 
+private function ensureMesiPreferiti(): void
+{
+    if (!empty($this->mesiPreferiti)) return;
+    $this->mesiPreferiti = $this->caricaMesiPreferiti($this->clienteId);
+}
+
 
 private function alignToPreferred(?string $due): ?string
 {
     if (!$due) return null;
+    $this->ensureMesiPreferiti();
     $months = $this->mesiPreferiti;
     $today  = now()->startOfMonth();
     $dueC   = Carbon::parse($due)->startOfMonth();
@@ -206,6 +213,11 @@ private function ricalcolaDatePerRiga(array &$row): void
 {
     $dataSerb = $row['data_serbatoio'] ?? null;
     $tipoId   = $row['tipo_estintore_id'] ?? null;
+    $lastRev  = $row['data_ultima_revisione'] ?? null;
+    if ($lastRev && Carbon::parse($lastRev)->startOfDay()->gt(now()->startOfDay())) {
+        $lastRev = null;
+        $row['data_ultima_revisione'] = null;
+    }
     if (!$dataSerb || !$tipoId) {
         // se manca uno dei due, azzero le derivate (meglio esplicito)
         $row['data_revisione']    = null;
@@ -222,10 +234,10 @@ private function ricalcolaDatePerRiga(array &$row): void
     $periodoRev    = self::pickPeriodoRevisione(
         $dataSerb,
         $classi,
-        $row['data_ultima_revisione'] ?? null,
+        $lastRev,
         $row['marca_serbatoio'] ?? null
     );
-    $baseRevisione = ($row['data_ultima_revisione'] ?? null) ?: $dataSerb;
+    $baseRevisione = $lastRev ?: $dataSerb;
     $scadRevisione = self::nextDueAfter($baseRevisione, $periodoRev);
      
     $scadCollaudo  = !empty($classi?->anni_collaudo) ? self::nextDueAfter($dataSerb, (int)$classi->anni_collaudo) : null;
@@ -403,60 +415,6 @@ public function ricalcola(string $scope, int $index): void
         };
         $today = now()->startOfMonth();
 
-        // Mesi preferiti cliente (accetta array JSON o CSV "1,3,6,...")
-        $cliente = \App\Models\Cliente::find($this->clienteId);
-        $mesiPref = [];
-        if ($cliente) {
-            $raw = $cliente->mesi_intervento ?? $cliente->mesi ?? null;
-            if (is_string($raw)) {
-                $mesiPref = collect(explode(',', $raw))
-                    ->map(fn($x)=> (int)trim($x))->filter(fn($m)=>$m>=1 && $m<=12)->unique()->values()->all();
-            } elseif (is_array($raw)) {
-                $mesiPref = collect($raw)->map(fn($m)=>(int)$m)->filter(fn($m)=>$m>=1 && $m<=12)->unique()->values()->all();
-            }
-        }
-
-        // Allinea ad uno dei mesi preferiti: il mese immediatamente precedente la scadenza,
-        // ma non prima dell'oggi. Se nessun mese valido nel range, prende il primo >= oggi.
-        $alignToPreferred = function (?string $due, array $months) use ($today): ?string {
-            if (!$due) return null;
-            $dueC   = \Illuminate\Support\Carbon::parse($due)->startOfMonth();
-            $start  = $today->copy();
-
-            // senza preferenze: prendo il mese prima della scadenza, ma >= oggi
-            if (!count($months)) {
-                $cand = $dueC->copy()->subMonth();
-                if ($cand->lt($start)) $cand = $start;
-                return $cand->format('Y-m-d');
-            }
-
-            // cerca l'ultimo mese preferito in [oggi, scadenza) (strettamente prima della scadenza)
-            $candidates = [];
-            $cur = $start->copy();
-            while ($cur->lt($dueC) || $cur->equalTo($dueC)) {
-                if ((int)$cur->month === (int)$dueC->month && (int)$cur->year === (int)$dueC->year) {
-                    // non includere la scadenza stessa: "subito prima"
-                    break;
-                }
-                if (in_array((int)$cur->month, $months, true)) {
-                    $candidates[] = $cur->copy();
-                }
-                $cur->addMonth();
-            }
-            if ($candidates) {
-                return end($candidates)->format('Y-m-d');
-            }
-
-            // nessun mese preferito nel range: scegli il primo mese preferito >= oggi (entro 24 mesi)
-            $cur = $start->copy();
-            for ($i=0; $i<24; $i++) {
-                if (in_array((int)$cur->month, $months, true)) {
-                    return $cur->format('Y-m-d');
-                }
-                $cur->addMonth();
-            }
-            return $start->format('Y-m-d');
-        };
         // -----------------------------------------------------------------------
 
         // carica e parse
@@ -524,6 +482,9 @@ public function ricalcola(string $scope, int $index): void
                     $dataSerb         = $parseData($dataSerbatoioRaw);
                     $marcaSerbatoio   = self::parseMarcaSerbatoio($dataSerbatoioRaw);
                     $dataUltimaRevisione = self::parseDataCell($r['riempimento_revisione'] ?? null); // <- USATA per la prossima revisione
+                    if ($dataUltimaRevisione && Carbon::parse($dataUltimaRevisione)->startOfDay()->gt(now()->startOfDay())) {
+                        $dataUltimaRevisione = null;
+                    }
                     $lastCollaudoRev     = self::parseDataCell($r['collaudo_revisione']   ?? null); // info (non usata)
                     
                     // calcoli da serbatoio
@@ -826,10 +787,11 @@ public function ricalcola(string $scope, int $index): void
     
         return Carbon::create($year, $month, 1)->format('Y-m-d');
     }
-    private function visitaOnOrBefore(?string $due): ?string
-    {
-        if (!$due) return null;
-        $months = $this->mesiPreferiti ?? [];
+private function visitaOnOrBefore(?string $due): ?string
+{
+    if (!$due) return null;
+    $this->ensureMesiPreferiti();
+    $months = $this->mesiPreferiti ?? [];
         $dueC   = Carbon::parse($due)->startOfMonth();
 
         // Nessuna preferenza: per la revisione tieni il mese della scadenza
