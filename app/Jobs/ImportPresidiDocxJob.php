@@ -17,16 +17,40 @@ class ImportPresidiDocxJob implements ShouldQueue
     public string $path;
     public int $clienteId;
     public ?int $sedeId;
+    public string $azione;
 
-    public function __construct(string $path, int $clienteId, ?int $sedeId = null)
+    public function __construct(string $path, int $clienteId, ?int $sedeId = null, string $azione = 'skip_if_exists')
     {
         $this->path = $path;
         $this->clienteId = $clienteId;
         $this->sedeId = $sedeId;
+        $this->azione = $azione;
     }
 
     public function handle(): void
     {
+        if ($this->azione === 'overwrite') {
+            \App\Models\Presidio::where('cliente_id', $this->clienteId)
+                ->when($this->sedeId === null, fn($q) => $q->whereNull('sede_id'))
+                ->when($this->sedeId !== null, fn($q) => $q->where('sede_id', $this->sedeId))
+                ->delete();
+        }
+
+        if ($this->azione === 'skip_if_exists') {
+            $exists = \App\Models\Presidio::where('cliente_id', $this->clienteId)
+                ->when($this->sedeId === null, fn($q) => $q->whereNull('sede_id'))
+                ->when($this->sedeId !== null, fn($q) => $q->where('sede_id', $this->sedeId))
+                ->exists();
+            if ($exists) {
+                Log::info('[IMPORT MASSIVO] Saltato (presidi già presenti)', [
+                    'cliente_id' => $this->clienteId,
+                    'sede_id' => $this->sedeId,
+                    'path' => $this->path,
+                ]);
+                return;
+            }
+        }
+
         $importer = new DocxPresidiImporter($this->clienteId, $this->sedeId);
         $res = $importer->importFromPath($this->path);
         Log::info('[IMPORT MASSIVO] Completato', [

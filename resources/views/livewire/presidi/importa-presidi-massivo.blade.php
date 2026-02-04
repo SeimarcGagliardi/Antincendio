@@ -46,6 +46,8 @@
                             <th class="px-2 py-1">Cliente</th>
                             <th class="px-2 py-1">Dati cliente</th>
                             <th class="px-2 py-1">Sede</th>
+                            <th class="px-2 py-1">Presidi esistenti</th>
+                            <th class="px-2 py-1">Azione</th>
                             <th class="px-2 py-1">Stato</th>
                         </tr>
                     </thead>
@@ -77,6 +79,24 @@
                                                     <option value="{{ $s['id'] }}">{{ $s['nome'] }}</option>
                                                 @endforeach
                                             @endif
+                                        </select>
+                                    @else
+                                        —
+                                    @endif
+                                </td>
+                                <td class="px-2 py-1">
+                                    @if(($r['status'] ?? '') === 'ok')
+                                        {{ $r['presidi_esistenti'] ?? 0 }}
+                                    @else
+                                        —
+                                    @endif
+                                </td>
+                                <td class="px-2 py-1">
+                                    @if(($r['status'] ?? '') === 'ok')
+                                        <select wire:model.defer="fileRows.{{ $r['index'] }}.azione"
+                                                class="input input-bordered text-xs">
+                                            <option value="skip_if_exists">Salta se presenti</option>
+                                            <option value="overwrite">Sovrascrivi</option>
                                         </select>
                                     @else
                                         —

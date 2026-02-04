@@ -5,6 +5,7 @@ namespace App\Livewire\Presidi;
 use App\Jobs\ImportPresidiDocxJob;
 use App\Models\Cliente;
 use App\Models\Sede;
+use App\Models\Presidio;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
@@ -74,6 +75,7 @@ class ImportaPresidiMassivo extends Component
                     ->all();
                 $row['sedi'] = $sedi;
                 $row['sede_id'] = count($sedi) ? $sedi[0]['id'] : 'principal';
+                $row['azione'] = 'skip_if_exists';
 
                 $this->clientiInput[$cliente->id] = $this->clientiInput[$cliente->id] ?? [
                     'nome' => $cliente->nome,
@@ -86,6 +88,19 @@ class ImportaPresidiMassivo extends Component
             }
 
             $this->fileRows[] = $row;
+        }
+
+        // dopo aver impostato le sedi, calcola presidi esistenti per cliente+sede
+        foreach ($this->fileRows as $idx => $row) {
+            if (($row['status'] ?? '') !== 'ok') continue;
+            $clienteId = $row['cliente_id'] ?? null;
+            if (!$clienteId) continue;
+            $sedeId = $row['sede_id'] ?? null;
+            $count = Presidio::where('cliente_id', $clienteId)
+                ->when($sedeId === 'principal', fn($q) => $q->whereNull('sede_id'))
+                ->when($sedeId !== 'principal', fn($q) => $q->where('sede_id', $sedeId))
+                ->count();
+            $this->fileRows[$idx]['presidi_esistenti'] = $count;
         }
     }
 
@@ -111,6 +126,7 @@ class ImportaPresidiMassivo extends Component
         foreach ($this->fileRows as $row) {
             if ($row['status'] !== 'ok') return false;
             if (empty($row['sede_id'])) return false;
+            if (($row['presidi_esistenti'] ?? 0) > 0 && empty($row['azione'])) return false;
         }
         foreach ($this->clientiInput as $data) {
             $mesi = $data['mesi_visita'] ?? [];
@@ -134,7 +150,12 @@ class ImportaPresidiMassivo extends Component
             if (!$file) continue;
             $path = $file->store('import_massivo', 'local');
             $sedeId = $row['sede_id'] === 'principal' ? null : (int)$row['sede_id'];
-            ImportPresidiDocxJob::dispatch(storage_path('app/'.$path), (int)$row['cliente_id'], $sedeId);
+            ImportPresidiDocxJob::dispatch(
+                storage_path('app/'.$path),
+                (int)$row['cliente_id'],
+                $sedeId,
+                $row['azione'] ?? 'skip_if_exists'
+            );
         }
 
         $this->dispatch('toast', type: 'success', message: 'Import massivo avviato in coda.');
