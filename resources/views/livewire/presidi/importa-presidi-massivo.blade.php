@@ -4,7 +4,7 @@
             <h2 class="text-xl font-semibold text-red-600">Import massivo presidi</h2>
             <a href="{{ route('clienti.index') }}"
                class="text-sm text-gray-600 hover:text-red-600">
-                <i class="fa fa-arrow-left mr-1"></i> Torna a gestione presidi
+                <i class="fa fa-arrow-left mr-1"></i> Torna alla lista clienti
             </a>
         </div>
 
@@ -44,6 +44,7 @@
                             <th class="px-2 py-1">File</th>
                             <th class="px-2 py-1">Codice</th>
                             <th class="px-2 py-1">Cliente</th>
+                            <th class="px-2 py-1">Dati cliente</th>
                             <th class="px-2 py-1">Sede</th>
                             <th class="px-2 py-1">Stato</th>
                         </tr>
@@ -54,6 +55,18 @@
                                 <td class="px-2 py-1">{{ $r['name'] }}</td>
                                 <td class="px-2 py-1">{{ $r['code4'] ?? '—' }}</td>
                                 <td class="px-2 py-1">{{ $r['cliente_nome'] ?? '—' }}</td>
+                                <td class="px-2 py-1 text-xs">
+                                    @php
+                                        $cid = $r['cliente_id'] ?? null;
+                                        $cdata = $cid ? ($clientiInput[$cid] ?? null) : null;
+                                        $mesiOk = !empty($cdata['mesi_visita'] ?? []);
+                                        $tempiOk = !empty($cdata['minuti_intervento_mese1'] ?? null) && !empty($cdata['minuti_intervento_mese2'] ?? null);
+                                        $zonaOk = !empty($cdata['zona'] ?? null);
+                                    @endphp
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded {{ $mesiOk ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700' }}">Mesi</span>
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded {{ $tempiOk ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700' }}">Tempi</span>
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded {{ $zonaOk ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700' }}">Zona</span>
+                                </td>
                                 <td class="px-2 py-1">
                                     @if(($r['status'] ?? '') === 'ok')
                                         <select wire:model.defer="fileRows.{{ $r['index'] }}.sede_id"

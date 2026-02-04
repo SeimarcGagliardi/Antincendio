@@ -11,6 +11,10 @@
         </form>
 
         <div class="flex items-center gap-2">
+            <a href="{{ route('presidi.import.massivo') }}"
+               class="inline-flex items-center px-3 py-2 rounded bg-gray-800 text-white text-xs hover:bg-gray-900">
+                <i class="fa fa-layer-group mr-1"></i> Import massivo presidi
+            </a>
             <label for="perPage" class="text-sm font-medium">Mostra</label>
             <select
                 id="perPage"
