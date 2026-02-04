@@ -10,6 +10,7 @@ use App\Livewire\Utenti\Index as UtentiIndex;
 use App\Livewire\Clienti\Index as ClientiIndex;
 use App\Livewire\Clienti\Mostra;
 use App\Livewire\Presidi\GestionePresidi;
+use App\Livewire\Presidi\ImportaPresidiMassivo;
 
 use App\Livewire\StatisticheAvanzate;
 use App\Livewire\Interventi\PlanningSettimanale;
@@ -82,6 +83,8 @@ Route::middleware('auth')->group(function () {
 Route::middleware(['auth'])->group(function () {
     Route::get('/presidi/gestione/{clienteId}/{sedeId?}', GestionePresidi::class)
         ->name('presidi.gestione');
+    Route::get('/presidi/import-massivo', ImportaPresidiMassivo::class)
+        ->name('presidi.import.massivo');
 });
 
 

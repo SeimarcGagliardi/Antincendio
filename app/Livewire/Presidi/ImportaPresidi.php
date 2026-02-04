@@ -294,7 +294,7 @@ public function ricalcola(string $scope, int $index): void
         return $map[$h] ?? $h;
     }
 
-    private static function parseDataCell(?string $txt): ?string
+    public static function parseDataCell(?string $txt): ?string
     {
         $txt = trim((string)$txt);
         if ($txt === '') return null;
@@ -313,7 +313,7 @@ public function ricalcola(string $scope, int $index): void
         return null;
     }
 
-    private static function parseMarcaSerbatoio(?string $txt): ?string
+    public static function parseMarcaSerbatoio(?string $txt): ?string
     {
         $txt = trim((string)$txt);
         if ($txt === '') return null;

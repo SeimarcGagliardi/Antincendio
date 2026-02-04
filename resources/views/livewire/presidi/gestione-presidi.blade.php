@@ -18,6 +18,12 @@
                 {{ $mesi ? implode(', ', $mesi) : '—' }}
             </div>
         </div>
+        <div class="mt-3">
+            <a href="{{ route('presidi.import.massivo') }}"
+               class="inline-flex items-center px-3 py-2 rounded bg-gray-800 text-white text-xs hover:bg-gray-900">
+                <i class="fa fa-layer-group mr-1"></i> Import massivo (multi‑file)
+            </a>
+        </div>
     </div>
 
     <hr class="my-8 border-t">
