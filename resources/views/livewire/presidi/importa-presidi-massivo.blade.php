@@ -71,12 +71,11 @@
                                     @if(($r['status'] ?? '') === 'ok')
                                         <select wire:model.defer="fileRows.{{ $r['index'] }}.sede_id"
                                                 class="input input-bordered text-xs">
+                                            <option value="principal">Sede principale (nessuna sede)</option>
                                             @if(!empty($r['sedi']))
                                                 @foreach($r['sedi'] as $s)
                                                     <option value="{{ $s['id'] }}">{{ $s['nome'] }}</option>
                                                 @endforeach
-                                            @else
-                                                <option value="auto">Sede principale (auto)</option>
                                             @endif
                                         </select>
                                     @else

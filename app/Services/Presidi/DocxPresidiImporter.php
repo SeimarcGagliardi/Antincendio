@@ -156,26 +156,15 @@ class DocxPresidiImporter
         return ['importati' => $importati, 'saltati' => $saltati];
     }
 
-    private function resolveSedeId(): int
+    private function resolveSedeId(): ?int
     {
         if ($this->sedeId) return $this->sedeId;
 
         $sede = Sede::where('cliente_id', $this->clienteId)->first();
         if ($sede) return $sede->id;
 
-        $cliente = Cliente::find($this->clienteId);
-        $new = Sede::create([
-            'cliente_id' => $this->clienteId,
-            'nome'       => 'Sede principale',
-            'indirizzo'  => $cliente?->indirizzo,
-            'citta'      => $cliente?->citta,
-            'cap'        => $cliente?->cap,
-            'provincia'  => $cliente?->provincia,
-            'codice_esterno' => $cliente?->codice_esterno,
-            'minuti_intervento' => $cliente?->minuti_intervento ?? 60,
-            'mesi_visita' => $cliente?->mesi_visita ?? [],
-        ]);
-        return $new->id;
+        // Sede principale = sede_id NULL
+        return null;
     }
 
     private function caricaMesiPreferiti(): array

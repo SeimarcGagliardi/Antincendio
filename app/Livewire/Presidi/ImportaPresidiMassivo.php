@@ -73,7 +73,7 @@ class ImportaPresidiMassivo extends Component
                     ->values()
                     ->all();
                 $row['sedi'] = $sedi;
-                $row['sede_id'] = count($sedi) ? $sedi[0]['id'] : 'auto';
+                $row['sede_id'] = count($sedi) ? $sedi[0]['id'] : 'principal';
 
                 $this->clientiInput[$cliente->id] = $this->clientiInput[$cliente->id] ?? [
                     'nome' => $cliente->nome,
@@ -133,7 +133,7 @@ class ImportaPresidiMassivo extends Component
             $file = $this->files[$row['index']] ?? null;
             if (!$file) continue;
             $path = $file->store('import_massivo', 'local');
-            $sedeId = $row['sede_id'] === 'auto' ? null : (int)$row['sede_id'];
+            $sedeId = $row['sede_id'] === 'principal' ? null : (int)$row['sede_id'];
             ImportPresidiDocxJob::dispatch(storage_path('app/'.$path), (int)$row['cliente_id'], $sedeId);
         }
 
