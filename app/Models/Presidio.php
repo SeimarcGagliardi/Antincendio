@@ -18,6 +18,7 @@ class Presidio extends Model
     protected $fillable = [
         'cliente_id', 'sede_id', 'categoria', 'progressivo',
         'ubicazione', 'tipo_contratto', 'tipo_estintore_id',
+        'idrante_tipo','idrante_lunghezza','idrante_sopra_suolo','idrante_sotto_suolo','porta_tipo',
         'data_serbatoio', 'marca_serbatoio', 'data_ultima_revisione',
         'data_revisione', 'data_collaudo',
         'data_fine_vita', 'data_sostituzione',

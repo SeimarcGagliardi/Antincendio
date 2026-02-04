@@ -12,6 +12,7 @@ class ImportPresidio extends Model
     protected $fillable = [
         'cliente_id', 'sede_id', 'categoria', 'progressivo',
         'ubicazione', 'tipo_contratto', 'tipo_estintore', 'tipo_estintore_id',
+        'idrante_tipo','idrante_lunghezza','idrante_sopra_suolo','idrante_sotto_suolo','porta_tipo',
         'flag_anomalia1', 'flag_anomalia2', 'flag_anomalia3',
         'note', 'data_serbatoio', 'marca_serbatoio', 'data_revisione', 'data_collaudo',
         'data_fine_vita', 'data_sostituzione', 'data_acquisto', 'scadenza_presidio','data_ultima_revisione'

@@ -94,6 +94,7 @@
                         <col style="width:110px"> {{-- Preventivo --}}
                         <col style="width:110px"> {{-- Azioni --}}
                     @else
+                        <col style="width:200px"> {{-- Tipo/Dettagli --}}
                         <col style="width:220px"> {{-- Note --}}
                         <col style="width:110px"> {{-- Azioni --}}
                     @endif
@@ -120,6 +121,7 @@
                             <th class="px-2 py-1">Preventivo</th>
                             <th class="px-2 py-1 text-center">Azioni</th>
                         @else
+                            <th class="px-2 py-1">Tipo/Dettagli</th>
                             <th class="px-2 py-1">Note</th>
                             <th class="px-2 py-1 text-center">Azioni</th>
                         @endif
@@ -139,6 +141,9 @@
                                         wire:model.defer="presidiData.{{ $presidio->id }}.ubicazione"
                                         class="form-input w-full rounded-md border-gray-300 focus:border-red-500 focus:ring focus:ring-red-200 text-sm" />
                                 @else
+                                    @if($categoriaAttiva !== 'Estintore')
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-700 mr-2">{{ strtoupper($presidio->categoria) }}</span>
+                                    @endif
                                     {{ $presidio->ubicazione }}
                                 @endif
                             </td>
@@ -325,16 +330,64 @@
                                     @endif
                                 </td>
                             @else
-                                {{-- Note (Idrante/Porta) --}}
-                                <td class="px-2 py-1">
-                                    @if($presidio->id === $presidioInModifica)
-                                        <input type="text"
-                                            wire:model.defer="presidiData.{{ $presidio->id }}.note"
-                                            class="form-input w-full rounded-md border-gray-300 text-sm" />
+                            {{-- Tipo/Dettagli (Idrante/Porta) --}}
+                            <td class="px-2 py-1">
+                                @if($presidio->id === $presidioInModifica)
+                                    @if($presidio->categoria === 'Idrante')
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <select wire:model.defer="presidiData.{{ $presidio->id }}.idrante_tipo"
+                                                    class="form-select text-xs">
+                                                <option value="">-- tipo --</option>
+                                                <option value="45">45</option>
+                                                <option value="70">70</option>
+                                                <option value="NASPO">NASPO</option>
+                                            </select>
+                                            <input type="text"
+                                                   wire:model.defer="presidiData.{{ $presidio->id }}.idrante_lunghezza"
+                                                   class="form-input w-24 text-xs"
+                                                   placeholder="es. 20 Mt">
+                                            <label class="inline-flex items-center text-xs gap-1">
+                                                <input type="checkbox"
+                                                       wire:model.defer="presidiData.{{ $presidio->id }}.idrante_sopra_suolo">
+                                                Sopra
+                                            </label>
+                                            <label class="inline-flex items-center text-xs gap-1">
+                                                <input type="checkbox"
+                                                       wire:model.defer="presidiData.{{ $presidio->id }}.idrante_sotto_suolo">
+                                                Sotto
+                                            </label>
+                                        </div>
                                     @else
-                                        {{ $presidio->note }}
+                                        <input type="text"
+                                               wire:model.defer="presidiData.{{ $presidio->id }}.porta_tipo"
+                                               class="form-input w-full text-xs"
+                                               placeholder="es. U.E. 2 ANTE">
                                     @endif
-                                </td>
+                                @else
+                                    @if($presidio->categoria === 'Idrante')
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-700 mr-2">IDRANTE</span>
+                                        <span class="text-xs text-gray-700">
+                                            {{ $presidio->idrante_tipo }} {{ $presidio->idrante_lunghezza }}
+                                            @if($presidio->idrante_sopra_suolo) · sopra @endif
+                                            @if($presidio->idrante_sotto_suolo) · sotto @endif
+                                        </span>
+                                    @else
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-amber-100 text-amber-700 mr-2">PORTA</span>
+                                        <span class="text-xs text-gray-700">{{ $presidio->porta_tipo }}</span>
+                                    @endif
+                                @endif
+                            </td>
+
+                            {{-- Note (Idrante/Porta) --}}
+                            <td class="px-2 py-1">
+                                @if($presidio->id === $presidioInModifica)
+                                    <input type="text"
+                                        wire:model.defer="presidiData.{{ $presidio->id }}.note"
+                                        class="form-input w-full rounded-md border-gray-300 text-sm" />
+                                @else
+                                    {{ $presidio->note }}
+                                @endif
+                            </td>
 
                                 {{-- Azioni --}}
                                 <td class="px-2 py-1 text-center">

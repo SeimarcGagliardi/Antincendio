@@ -102,6 +102,13 @@ class DocxPresidiImporter
 
                     if ($tableType === 'idranti') {
                         $note = $r['note'] ?? null;
+                        $idrTipo = null;
+                        $idrLen  = null;
+                        if (!empty($r['idrante_45'] ?? null)) { $idrTipo = '45'; $idrLen = $r['idrante_45']; }
+                        if (!empty($r['idrante_70'] ?? null)) { $idrTipo = '70'; $idrLen = $r['idrante_70']; }
+                        if (!empty($r['idrante_naspo'] ?? null)) { $idrTipo = 'NASPO'; $idrLen = $r['idrante_naspo']; }
+                        $sopra = !empty($r['sopra_suolo'] ?? null);
+                        $sotto = !empty($r['sotto_suolo'] ?? null);
                         $flag1 = !empty($r['anomalia_cartello'] ?? null);
                         $flag2 = !empty($r['anomalia_lancia'] ?? null);
                         $flag3 = !empty($r['anomalia_lastra'] ?? null);
@@ -117,6 +124,10 @@ class DocxPresidiImporter
                             [
                                 'ubicazione'        => $ubic,
                                 'tipo_contratto'    => $contratto,
+                                'idrante_tipo'      => $idrTipo,
+                                'idrante_lunghezza' => $idrLen,
+                                'idrante_sopra_suolo'=> $sopra,
+                                'idrante_sotto_suolo'=> $sotto,
                                 'flag_anomalia1'    => $flag1,
                                 'flag_anomalia2'    => $flag2,
                                 'flag_anomalia3'    => $flag3,
@@ -129,6 +140,7 @@ class DocxPresidiImporter
 
                     if ($tableType === 'porte') {
                         $note = $r['note'] ?? null;
+                        $portaTipo = $r['porta_tipo'] ?? null;
                         $flag1 = !empty($r['anomalia_maniglione'] ?? null);
                         $flag2 = !empty($r['anomalia_molla'] ?? null);
                         $flag3 = !empty($r['anomalia_numerazione'] ?? null);
@@ -145,6 +157,7 @@ class DocxPresidiImporter
                             [
                                 'ubicazione'        => $ubic,
                                 'tipo_contratto'    => $contratto,
+                                'porta_tipo'        => $portaTipo,
                                 'flag_anomalia1'    => $flag1,
                                 'flag_anomalia2'    => $flag2,
                                 'flag_anomalia3'    => $flag3,
@@ -358,6 +371,11 @@ class DocxPresidiImporter
             'N' => 'numero',
             'UBICAZIONE' => 'ubicazione',
             'NOTE' => 'note',
+            '45' => 'idrante_45',
+            '70' => 'idrante_70',
+            'NASPO' => 'idrante_naspo',
+            'SOPRA SUOLO' => 'sopra_suolo',
+            'SOTTO SUOLO' => 'sotto_suolo',
             'MANCA CARTELLO' => 'anomalia_cartello',
             'MANCA LANCIA O DA SOSTITUIRE' => 'anomalia_lancia',
             'LASTRA S.CRASH DANNEGG O MANCANTE INDICARE MISURE' => 'anomalia_lastra',
@@ -372,8 +390,8 @@ class DocxPresidiImporter
             'N' => 'numero',
             'UBICAZIONE' => 'ubicazione',
             'MALFUNZIONAMENTI' => 'note',
-            'ANTE (1 O 2)' => 'tipo_contratto',
-            'ANTE  (1 O 2)' => 'tipo_contratto',
+            'ANTE (1 O 2)' => 'porta_tipo',
+            'ANTE  (1 O 2)' => 'porta_tipo',
             'MANIGLIONE NON CE' => 'anomalia_maniglione',
             'TIRATA MOLLA' => 'anomalia_molla',
             'NUMERAZIONE' => 'anomalia_numerazione',
