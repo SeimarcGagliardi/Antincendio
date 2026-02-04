@@ -131,7 +131,7 @@ private function guessTipoEstintoreId(string $raw): ?int
     return null;
 }
 // === UTIL PER MESI PREFERITI
-private function caricaMesiPreferiti(int $clienteId): array
+public function caricaMesiPreferiti(int $clienteId): array
 {
     $cliente = \App\Models\Cliente::find($clienteId);
     $sede    = $this->sedeId ? \App\Models\Sede::find($this->sedeId) : null;
@@ -689,7 +689,7 @@ public function ricalcola(string $scope, int $index): void
         return array_slice($out, 0, $max);
     }
 
-    private static function addYears(?string $d, ?int $y): ?string
+    public static function addYears(?string $d, ?int $y): ?string
     {
         return $d && $y ? Carbon::parse($d)->addYears($y)->format('Y-m-d') : null;
     }
@@ -762,7 +762,7 @@ public function ricalcola(string $scope, int $index): void
      * Calcola la prossima scadenza di revisione > today.
      * Ritorna 'Y-m-d' (primo giorno del mese della scadenza).
      */
-    private static function nextDueAfter(?string $start, ?int $periodYears, ?Carbon $today = null): ?string
+    public static function nextDueAfter(?string $start, ?int $periodYears, ?Carbon $today = null): ?string
     {
         if (!$start || !$periodYears || $periodYears <= 0) return null;
     
@@ -785,7 +785,7 @@ public function ricalcola(string $scope, int $index): void
      * Dato una scadenza, restituisce la "visita subito prima" (mese pianificato < mese scadenza).
      * Esempio: scadenza 2027-05-01 con visite [5,11] => 2026-11-01.
      */
-    private static function previousVisitBefore(string $dueYmd, array $visitMonths): string
+    public static function previousVisitBefore(string $dueYmd, array $visitMonths): string
     {
         sort($visitMonths); // es. [5, 11]
         $due  = Carbon::parse($dueYmd);
@@ -802,7 +802,7 @@ public function ricalcola(string $scope, int $index): void
     
         return Carbon::create($year, $month, 1)->format('Y-m-d');
     }
-    private function visitaOnOrBefore(?string $due): ?string
+    public function visitaOnOrBefore(?string $due): ?string
     {
         if (!$due) return null;
         $months = $this->mesiPreferiti ?? [];
@@ -821,7 +821,7 @@ public function ricalcola(string $scope, int $index): void
         // Altrimenti: mese visita immediatamente precedente
         return self::previousVisitBefore($dueC->format('Y-m-d'), $months);
     }
-    private static function pickPeriodoRevisione(?string $dataSerbatoio, $classi, ?string $dataUltimaRevisione = null): ?int
+    public static function pickPeriodoRevisione(?string $dataSerbatoio, $classi, ?string $dataUltimaRevisione = null): ?int
     {
         if (!$classi) return null;
     
@@ -842,7 +842,7 @@ public function ricalcola(string $scope, int $index): void
     }
     
 
-private static function minDate(?string ...$dates): ?string
+public static function minDate(?string ...$dates): ?string
 {
     $valid = array_filter($dates);
     if (!$valid) return null;

@@ -161,7 +161,7 @@ class Presidio extends Model
      * Determina il periodo revisione in anni in base alla data serbatoio vs cutoff.
      * Se data_serbatoio manca, usa anni_revisione_prima come fallback conservativo.
      */
-    private function pickPeriodoRevisione(?Carbon $dataSerb, ClassificazioneEstintore $classi): ?int
+    public function pickPeriodoRevisione(?Carbon $dataSerb, ClassificazioneEstintore $classi): ?int
     {
         $cutover = Carbon::parse(self::CUTOFF)->startOfDay();
 
@@ -192,7 +192,7 @@ class Presidio extends Model
      * Prossima scadenza > oggi partendo da $start e saltando multipli di $periodYears.
      * Ritorna 'Y-m-d'.
      */
-    private function nextDueAfter(?Carbon $start, ?int $periodYears): ?string
+    public function nextDueAfter(?Carbon $start, ?int $periodYears): ?string
     {
         if (!$start || !$periodYears || $periodYears <= 0) return null;
 
@@ -210,7 +210,7 @@ class Presidio extends Model
      * - Se ci sono mesi preferiti, usa previousVisitBefore().
      * - Se non ci sono mesi, ritorna semplicemente il mese precedente alla scadenza.
      */
-    private function visitaPrimaDi(?string $dueYmd, array $mesiVisita): ?string
+    public function visitaPrimaDi(?string $dueYmd, array $mesiVisita): ?string
     {
         if (!$dueYmd) return null;
         if (!count($mesiVisita)) {
@@ -223,7 +223,7 @@ class Presidio extends Model
      * Dato una scadenza, restituisce la "visita subito prima" (mese pianificato < mese scadenza).
      * Esempio: scadenza 2027-05-01 con visite [5,11] => 2026-11-01.
      */
-    private function previousVisitBefore(string $dueYmd, array $visitMonths): string
+    public function previousVisitBefore(string $dueYmd, array $visitMonths): string
     {
         sort($visitMonths); // es. [5, 11]
         $due  = Carbon::parse($dueYmd);
@@ -270,7 +270,7 @@ class Presidio extends Model
         return $this->previousVisitBefore($due->format('Y-m-d'), $mesiVisita);
     }
 
-    private function getMesiVisita(): array
+    public function getMesiVisita(): array
     {
         $candidates = [
             $this->sede->mesi_visita ?? null,
@@ -286,7 +286,7 @@ class Presidio extends Model
         return [];
     }
 
-    private function normalizeMonths($raw): array
+    public function normalizeMonths($raw): array
     {
         if (!$raw) return [];
 
