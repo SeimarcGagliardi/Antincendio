@@ -3,7 +3,7 @@
     $summary = $summary ?? [];
 @endphp
 
-<div id="statistiche-root" class="min-h-screen bg-slate-50">
+<div id="statistiche-root" class="min-h-screen bg-slate-50 text-slate-900">
     <div class="max-w-7xl mx-auto px-5 py-8 space-y-6">
         <div class="bg-gradient-to-r from-rose-600 via-red-500 to-orange-500 text-white rounded-2xl p-6 shadow-lg">
             <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -66,6 +66,7 @@
                         'clienti' => 'Clienti',
                         'durata' => 'Durata',
                         'categoria' => 'Categorie',
+                        'anomalie' => 'Anomalie',
                         'trend' => 'Trend',
                         'esiti' => 'Esiti'
                     ] as $key => $label)
@@ -101,21 +102,34 @@
             </div>
 
             <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
-                <h3 class="text-sm font-semibold text-slate-800 mb-3">Dettaglio</h3>
-                @if(empty($chart['table_rows'] ?? []))
-                    <div class="text-sm text-slate-500">Nessun dato da mostrare.</div>
-                @else
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-sm font-semibold text-slate-800">
+                        @if(!empty($drilldown['rows'] ?? []))
+                            Dettaglio selezione
+                        @else
+                            Dettaglio
+                        @endif
+                    </h3>
+                    @if(!empty($drilldown['rows'] ?? []))
+                        <button wire:click="clearDrilldown" class="text-xs text-slate-600 hover:text-slate-900 border border-slate-200 rounded px-2 py-1">
+                            Chiudi
+                        </button>
+                    @endif
+                </div>
+
+                @if(!empty($drilldown['rows'] ?? []))
+                    <div class="text-xs text-slate-500 mb-2">{{ $drilldown['title'] ?? '' }}</div>
                     <div class="overflow-auto max-h-[360px]">
                         <table class="w-full text-sm">
                             <thead class="text-xs text-slate-500 uppercase">
                                 <tr>
-                                    @foreach(($chart['table_headers'] ?? []) as $head)
+                                    @foreach(($drilldown['headers'] ?? []) as $head)
                                         <th class="text-left py-2">{{ $head }}</th>
                                     @endforeach
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100">
-                                @foreach(($chart['table_rows'] ?? []) as $row)
+                                @foreach(($drilldown['rows'] ?? []) as $row)
                                     <tr class="text-slate-700">
                                         @foreach($row as $cell)
                                             <td class="py-2 pr-2">{{ $cell }}</td>
@@ -125,6 +139,33 @@
                             </tbody>
                         </table>
                     </div>
+                    <div class="text-[11px] text-slate-400 mt-2">Mostro fino a 300 righe per performance.</div>
+                @else
+                    @if(empty($chart['table_rows'] ?? []))
+                        <div class="text-sm text-slate-500">Nessun dato da mostrare.</div>
+                    @else
+                        <div class="overflow-auto max-h-[360px]">
+                            <table class="w-full text-sm">
+                                <thead class="text-xs text-slate-500 uppercase">
+                                    <tr>
+                                        @foreach(($chart['table_headers'] ?? []) as $head)
+                                            <th class="text-left py-2">{{ $head }}</th>
+                                        @endforeach
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    @foreach(($chart['table_rows'] ?? []) as $row)
+                                        <tr class="text-slate-700">
+                                            @foreach($row as $cell)
+                                                <td class="py-2 pr-2">{{ $cell }}</td>
+                                            @endforeach
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="text-[11px] text-slate-400 mt-2">Clicca un elemento del grafico per il dettaglio.</div>
+                    @endif
                 @endif
             </div>
         </div>
@@ -166,12 +207,36 @@
             maintainAspectRatio: false,
             plugins: {
                 legend: {
-                    position: cfg.type === 'doughnut' ? 'bottom' : 'top'
+                    position: cfg.type === 'doughnut' ? 'bottom' : 'top',
+                    labels: {
+                        color: '#475569',
+                    },
                 }
-            }
+            },
+            onClick: (event, elements) => {
+                if (!elements || !elements.length) return;
+                const element = elements[0];
+                const index = element.index;
+                const datasetIndex = element.datasetIndex ?? 0;
+                const label = (cfg.labels || [])[index];
+                const key = (cfg.keys || [])[index] ?? label;
+                const datasetLabel = (cfg.datasets || [])[datasetIndex]?.label ?? null;
+
+                if (window.Livewire) {
+                    window.Livewire.dispatch('statistiche:drilldown', {
+                        chart: selected,
+                        label,
+                        key,
+                        dataset: datasetLabel,
+                    });
+                }
+            },
         };
         if (cfg.type !== 'doughnut') {
-            options.scales = { y: { beginAtZero: true, ticks: { precision: 0 } } };
+            options.scales = {
+                x: { ticks: { color: '#64748B' } },
+                y: { beginAtZero: true, ticks: { precision: 0, color: '#64748B' } },
+            };
         }
         if (cfg.axis) {
             options.indexAxis = cfg.axis;
