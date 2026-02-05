@@ -55,12 +55,19 @@ class SincronizzaClienti extends Command
 
         $this->setLastSync('anagra', $maxAnagra);
 
+        $destdivUltaggCol = $this->resolveDestdivUltaggColumn();
+        $destdivHasUltagg = $destdivUltaggCol ? $this->destdivHasAnyUltagg($destdivUltaggCol) : false;
+
         $destdivQuery = DB::connection('sqlsrv')->table('destdiv');
-        if ($lastDestdiv) {
-            $destdivQuery->where('an_ultagg', '>', $lastDestdiv);
+        if ($destdivHasUltagg && $lastDestdiv) {
+            $destdivQuery->where($destdivUltaggCol, '>', $lastDestdiv);
         }
 
-        $destdiv = $destdivQuery->orderBy('an_ultagg')->get();
+        if ($destdivHasUltagg) {
+            $destdivQuery->orderBy($destdivUltaggCol);
+        }
+
+        $destdiv = $destdivQuery->get();
         $sediCount = 0;
         $maxDestdiv = $lastDestdiv;
 
@@ -115,11 +122,15 @@ class SincronizzaClienti extends Command
                 );
 
                 $sediCount++;
-                $maxDestdiv = $this->maxTimestamp($maxDestdiv, $s->an_ultagg);
+                if ($destdivHasUltagg) {
+                    $maxDestdiv = $this->maxTimestamp($maxDestdiv, $s->{$destdivUltaggCol} ?? null);
+                }
             }
         }
 
-        $this->setLastSync('destdiv', $maxDestdiv);
+        if ($destdivHasUltagg) {
+            $this->setLastSync('destdiv', $maxDestdiv);
+        }
 
         $this->info("Sincronizzazione completata. Clienti: {$clientiCount}, Sedi: {$sediCount}.");
         return Command::SUCCESS;
@@ -173,5 +184,38 @@ class SincronizzaClienti extends Command
         }
 
         return $lastSync->copy()->subDays($days);
+    }
+
+    private function resolveDestdivUltaggColumn(): ?string
+    {
+        try {
+            $columns = DB::connection('sqlsrv')->getSchemaBuilder()->getColumnListing('destdiv');
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        $columnMap = [];
+        foreach ($columns as $col) {
+            $columnMap[strtolower($col)] = $col;
+        }
+        foreach (['dd_ultagg', 'an_ultagg', 'ultagg', 'dd_dataagg'] as $candidate) {
+            if (isset($columnMap[$candidate])) {
+                return $columnMap[$candidate];
+            }
+        }
+
+        return null;
+    }
+
+    private function destdivHasAnyUltagg(string $column): bool
+    {
+        try {
+            return DB::connection('sqlsrv')->table('destdiv')
+                ->whereNotNull($column)
+                ->limit(1)
+                ->exists();
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 }
