@@ -95,7 +95,10 @@ class DocxPresidiImporter
 
                     $r = [];
                     foreach ($vals as $i => $v) {
-                        $k = $headersMap[$i] ?? "col_$i";
+                        $k = $headersMap[$i] ?? null;
+                        if (!$k) {
+                            $k = "col_$i";
+                        }
                         $r[$k] = $v;
                     }
 
@@ -185,9 +188,21 @@ class DocxPresidiImporter
                     }
 
                     $tipoRaw  = trim((($r['kglt'] ?? '') . ' ' . ($r['classe'] ?? '')));
+                    if ($tipoRaw === '') {
+                        $tipoRaw = self::extractTipoFromValues($vals) ?? '';
+                    }
                     $joinedUp = mb_strtoupper(implode(' ', $vals));
+                    $isCarrellato = ImportaPresidi::isCarrellatoText($tipoRaw . ' ' . $joinedUp);
 
                     $tipoEstId = $this->guessTipoEstintoreId($tipoRaw !== '' ? $tipoRaw : $joinedUp);
+                    if ($isCarrellato && !$tipoEstId) {
+                        $cap = $this->detectCapacity($tipoRaw !== '' ? $tipoRaw : $joinedUp);
+                        if ($cap) {
+                            $tipoEstId = TipoEstintore::where('kg', $cap)
+                                ->where('sigla', 'like', 'ESSI%')
+                                ->value('id');
+                        }
+                    }
                     $tipoEst   = $tipoEstId ? TipoEstintore::with('classificazione')->find($tipoEstId) : null;
                     $classi    = $tipoEst?->classificazione;
 
@@ -201,18 +216,42 @@ class DocxPresidiImporter
                         $dataUltimaRev = null;
                     }
 
-                    if (!$dataSerb || !$tipoEstId) {
+                    if ($isCarrellato) {
+                        $alt1 = ImportaPresidi::parseDataCell($r['tipo_contratto'] ?? null);
+                        $alt2 = ImportaPresidi::parseDataCell($r['col_5'] ?? null);
+                        $cands = array_filter([$dataSerb, $alt1, $alt2]);
+                        if (!$dataSerb && $cands) {
+                            sort($cands);
+                            $dataSerb = $cands[0];
+                        }
+                        if ($alt1) {
+                            $contratto = '';
+                        }
+                        if ($alt1 && $alt2) {
+                            $dataUltimaRev = null;
+                        }
+                    }
+
+                    if (!$dataSerb || (!$tipoEstId && !$isCarrellato)) {
                         $saltati++;
                         continue;
                     }
 
-                    $periodoRev    = ImportaPresidi::pickPeriodoRevisione($dataSerb, $classi, $dataUltimaRev, $marcaSerbatoio);
-                    $baseRevisione = $dataUltimaRev ?: $dataSerb;
-                    $scadRevisione = ImportaPresidi::nextDueAfter($baseRevisione, $periodoRev);
-                    $scadCollaudo  = !empty($classi?->anni_collaudo)
-                        ? ImportaPresidi::nextDueAfter($dataSerb, (int)$classi->anni_collaudo)
-                        : null;
-                    $fineVita      = ImportaPresidi::addYears($dataSerb, $classi?->anni_fine_vita);
+                    if ($isCarrellato) {
+                        $periodoRev    = 5;
+                        $baseRevisione = $dataSerb;
+                        $scadRevisione = ImportaPresidi::nextDueAfter($baseRevisione, $periodoRev);
+                        $scadCollaudo  = null;
+                        $fineVita      = null;
+                    } else {
+                        $periodoRev    = ImportaPresidi::pickPeriodoRevisione($dataSerb, $classi, $dataUltimaRev, $marcaSerbatoio);
+                        $baseRevisione = $dataUltimaRev ?: $dataSerb;
+                        $scadRevisione = ImportaPresidi::nextDueAfter($baseRevisione, $periodoRev);
+                        $scadCollaudo  = !empty($classi?->anni_collaudo)
+                            ? ImportaPresidi::nextDueAfter($dataSerb, (int)$classi->anni_collaudo)
+                            : null;
+                        $fineVita      = ImportaPresidi::addYears($dataSerb, $classi?->anni_fine_vita);
+                    }
 
                     $revAligned  = self::visitaOnOrBeforeWithMonths($scadRevisione, $this->mesiPreferiti);
                     $colAligned  = self::visitaOnOrBeforeWithMonths($scadCollaudo, $this->mesiPreferiti);
@@ -232,6 +271,11 @@ class DocxPresidiImporter
                         continue;
                     }
 
+                    $noteExtra = null;
+                    if (!empty($r['collaudo_revisione'] ?? null) && !ImportaPresidi::parseDataCell($r['collaudo_revisione'])) {
+                        $noteExtra = trim((string)$r['collaudo_revisione']);
+                    }
+
                     Presidio::updateOrCreate(
                         [
                             'cliente_id' => $this->clienteId,
@@ -247,7 +291,7 @@ class DocxPresidiImporter
                             'flag_anomalia1'       => $flag1,
                             'flag_anomalia2'       => $flag2,
                             'flag_anomalia3'       => $flag3,
-                            'note'                 => null,
+                            'note'                 => $noteExtra,
                             'data_acquisto'        => $dataAcquisto,
                             'scadenza_presidio'    => $scadPresidio,
                             'data_serbatoio'       => $dataSerb,
@@ -508,6 +552,18 @@ class DocxPresidiImporter
         }
         if (preg_match('/\b(LT|L|LT\.)\s*(\d{1,3})(?:[,.]\d+)?\b/u', $u, $m)) {
             return (int) $m[2];
+        }
+        return null;
+    }
+
+    private static function extractTipoFromValues(array $vals): ?string
+    {
+        foreach ($vals as $v) {
+            $v = trim((string)$v);
+            if ($v === '') continue;
+            if (preg_match('/\b\d{1,3}\s*(KG|KGS|KG\.|LT|L|LT\.|LITRI)\b/i', $v)) {
+                return $v;
+            }
         }
         return null;
     }
