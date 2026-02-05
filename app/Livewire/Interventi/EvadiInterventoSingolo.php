@@ -99,7 +99,7 @@ public function salvaNuovoPresidio()
     ]);
 
     // Ricarico l'intervento completo con il nuovo legame
-    $this->intervento->load('presidiIntervento.presidio');
+    $this->intervento->load('presidiIntervento.presidio.tipoEstintore.colore');
     
     // Inizializzazione sicura input
     $this->input[$pi->id] = [
@@ -124,7 +124,7 @@ public function salvaNuovoPresidio()
     
     public function mount(Intervento $intervento)
     {
-        $this->intervento = $intervento->load('cliente', 'sede', 'presidiIntervento.presidio');
+        $this->intervento = $intervento->load('cliente', 'sede', 'presidiIntervento.presidio.tipoEstintore.colore');
         $this->durataEffettiva = $this->intervento->durata_effettiva;
 
         // Se non esistono ancora presidi_intervento, generarli
@@ -146,7 +146,7 @@ public function salvaNuovoPresidio()
             }
     
             // Reload dopo la creazione
-            $this->intervento->load('presidiIntervento.presidio');
+            $this->intervento->load('presidiIntervento.presidio.tipoEstintore.colore');
         }
     
         // Inizializzazione input per ogni presidio_intervento
@@ -197,7 +197,7 @@ public function salvaNuovoPresidio()
         $pi->delete();
     
         $this->messaggioSuccesso = 'Presidio rimosso dall’intervento.';
-        $this->intervento->load('presidiIntervento.presidio');
+    $this->intervento->load('presidiIntervento.presidio.tipoEstintore.colore');
     }
     public function getAnomalieProperty()
     {

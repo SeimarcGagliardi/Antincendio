@@ -130,9 +130,20 @@
 
                 <tbody>
                     @foreach($presidi as $index => $presidio)
+                        @php
+                            $rowHex = $presidio->tipoEstintore?->colore?->hex ?? null;
+                        @endphp
                         <tr wire:key="presidio-{{ $presidio->id }}" class="even:bg-gray-50 align-middle {{ $presidio->id === $presidioInModifica ? 'bg-yellow-50' : '' }}">
                             {{-- # --}}
-                            <td class="px-2 py-1 font-semibold text-center">{{ $presidio->progressivo }}</td>
+                            <td class="px-2 py-1 font-semibold text-center">
+                                <div class="flex items-center justify-center gap-2">
+                                    @if($isEst && $rowHex)
+                                        <span class="inline-block w-2.5 h-2.5 rounded-full ring-1 ring-black/10"
+                                              style="background-color: {{ $rowHex }}"></span>
+                                    @endif
+                                    <span>{{ $presidio->progressivo }}</span>
+                                </div>
+                            </td>
 
                             {{-- Ubicazione --}}
                             <td class="px-2 py-1">
@@ -174,8 +185,8 @@
                                         </select>
                                     @else
                                         @php
-                                            $hex   = $presidio->tipo?->colore?->hex ?? '#9CA3AF';
-                                            $sigla = $presidio->tipo?->sigla ?? optional($presidio->tipoEstintore)->sigla ?? '';
+                                            $hex   = $presidio->tipoEstintore?->colore?->hex ?? '#9CA3AF';
+                                            $sigla = $presidio->tipoEstintore?->sigla ?? '';
                                         @endphp
                                         <div class="flex items-center gap-2">
                                             <span class="inline-block w-3 h-3 rounded-full ring-1 ring-black/10"

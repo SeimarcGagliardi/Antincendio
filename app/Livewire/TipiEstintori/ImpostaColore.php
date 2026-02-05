@@ -8,22 +8,10 @@ use App\Models\Colore;
 
 class ImpostaColore extends Component
 {
-   
-
-    public function mount(): void
-    {
-        $this->caricaDati();
-    }
-
-    protected function caricaDati(): void
-    {
-        
-    }
-
     public function salva($idTipo,$idColore)
     {
         $tipo = TipoEstintore::findOrFail($idTipo);
-        $tipo->colore_id = $idColore;
+        $tipo->colore_id = $idColore ?: null;
         $tipo->save();
         
         session()->flash('message', 'Colori aggiornati correttamente.');

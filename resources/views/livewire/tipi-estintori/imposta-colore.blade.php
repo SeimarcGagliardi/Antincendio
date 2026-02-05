@@ -33,14 +33,22 @@
                 </div>
 
                 {{-- Colonna destra: select colore --}}
-                <div>
-                   @foreach ($colori as $colore)
-                    <button wire:click.prevent="salva({{ $tipo->id }}, {{$colore->id}})"> </button>
-                    
-                    @endforeach
-                    
-                    {{ $tipo->colore_id }}
-
+                <div class="flex items-center gap-3">
+                    <select
+                        class="input input-bordered text-sm w-full"
+                        wire:change="salva({{ $tipo->id }}, $event.target.value)">
+                        <option value="">Nessun colore</option>
+                        @foreach ($colori as $colore)
+                            <option value="{{ $colore->id }}" @selected($tipo->colore_id == $colore->id)>
+                                {{ $colore->nome }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @if ($tipo->colore)
+                        <span class="w-5 h-5 rounded-full border"
+                              title="{{ $tipo->colore->nome }}"
+                              style="background-color: {{ $tipo->colore->hex }}"></span>
+                    @endif
                 </div>
             </div>
         @empty

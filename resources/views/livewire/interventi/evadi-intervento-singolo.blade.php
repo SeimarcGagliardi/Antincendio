@@ -159,7 +159,18 @@
                                         <td class="p-2">
                                             <textarea wire:model="input.{{ $pi->id }}.note" class="w-full border-gray-300 rounded px-2 py-1" rows="2"></textarea>
                                         </td>
-                                        <td class="p-2">{{ $d['tipo_estintore_sigla'] }}</td>
+                                        <td class="p-2">
+                                            @php
+                                                $hex = $pi->presidio->tipoEstintore?->colore?->hex ?? null;
+                                            @endphp
+                                            <div class="flex items-center gap-2">
+                                                @if($hex)
+                                                    <span class="inline-block w-2.5 h-2.5 rounded-full ring-1 ring-black/10"
+                                                          style="background-color: {{ $hex }}"></span>
+                                                @endif
+                                                <span>{{ $d['tipo_estintore_sigla'] }}</span>
+                                            </div>
+                                        </td>
                                         <td class="p-2">
                                             @if($d['deve_ritirare'])
                                                 <span class="text-red-600 font-semibold">Sì</span>
@@ -213,7 +224,14 @@
                         <label class="text-sm">Ubicazione</label>
                         <input type="text" wire:model="input.{{ $pi->id }}.ubicazione" class="w-full text-sm border-gray-300 rounded px-2 py-1">
                     </div>
-                    <div class="text-sm text-gray-700">
+                    <div class="text-sm text-gray-700 flex items-center gap-2">
+                        @php
+                            $hex = $pi->presidio->tipoEstintore?->colore?->hex ?? null;
+                        @endphp
+                        @if($hex)
+                            <span class="inline-block w-2.5 h-2.5 rounded-full ring-1 ring-black/10"
+                                  style="background-color: {{ $hex }}"></span>
+                        @endif
                         <strong>Tipo estintore:</strong> {{ $d['tipo_estintore_sigla'] }}
                     </div>
 
