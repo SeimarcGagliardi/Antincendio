@@ -408,10 +408,13 @@ class DocxPresidiImporter
             'ANNO ACQUISTO FULL'         => 'anno_acquisto',
             'SCADENZA PRESIDIO FULL'     => 'scadenza_presidio',
             'ANNO SERBATOIO'             => 'anno_serbatoio',
+            'ANNO PRODUZIONE'            => 'anno_serbatoio',
             'RIEMPIMENTO/ REVISIONE'     => 'riempimento_revisione',
             'RIEMPIMENTO/REVISIONE'      => 'riempimento_revisione',
+            'ULTIMA REVISIONE'           => 'riempimento_revisione',
             'COLLAUDO/ REVISIONE'        => 'collaudo_revisione',
             'COLLAUDO/REVISIONE'         => 'collaudo_revisione',
+            'PROSSIMA REVISIONE'         => 'collaudo_revisione',
         ];
         return $map[$h] ?? $h;
     }

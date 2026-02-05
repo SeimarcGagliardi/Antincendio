@@ -14,6 +14,8 @@ class ProgressivoParser
         if ($raw === '') return null;
 
         $raw = preg_replace('/\s+/', ' ', $raw);
+        // Unisci cifre separate da spazi (es. "1 0" -> "10")
+        $raw = preg_replace('/(?<=\d)\s+(?=\d)/', '', $raw);
         $rawUp = mb_strtoupper($raw);
 
         if (!preg_match('/^(\d+)/', $rawUp, $m)) {
