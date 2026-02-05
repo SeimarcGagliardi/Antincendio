@@ -10,15 +10,16 @@ use App\Models\Sede;
 
 class SincronizzaClienti extends Command
 {
-    protected $signature = 'sincronizza:clienti';
+    protected $signature = 'sincronizza:clienti {--lookback=1 : Giorni di retrodatazione per sicurezza}';
     protected $description = 'Sincronizza clienti e sedi da MSSQL a MySQL (basata su codice_esterno)';
 
     public function handle()
     {
         $this->info("Inizio sincronizzazione clienti e sedi...");
 
-        $lastAnagra = $this->getLastSync('anagra');
-        $lastDestdiv = $this->getLastSync('destdiv');
+        $lookbackDays = (int) $this->option('lookback');
+        $lastAnagra = $this->applyLookback($this->getLastSync('anagra'), $lookbackDays);
+        $lastDestdiv = $this->applyLookback($this->getLastSync('destdiv'), $lookbackDays);
 
         $clientiQuery = DB::connection('sqlsrv')
             ->table('anagra')
@@ -163,5 +164,14 @@ class SincronizzaClienti extends Command
         }
 
         return $current;
+    }
+
+    private function applyLookback(?Carbon $lastSync, int $days): ?Carbon
+    {
+        if (!$lastSync || $days <= 0) {
+            return $lastSync;
+        }
+
+        return $lastSync->copy()->subDays($days);
     }
 }

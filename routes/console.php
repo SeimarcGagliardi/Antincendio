@@ -8,6 +8,6 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-Schedule::command('sincronizza:clienti')
+Schedule::command('sincronizza:clienti --lookback=1')
     ->cron('*/2 * * * *')
     ->withoutOverlapping();
