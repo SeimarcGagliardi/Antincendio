@@ -107,8 +107,23 @@
                             </thead>
                             <tbody>
                                 @foreach ($items as $pi)
-                                    @php $d = $input[$pi->id]; @endphp
-                                    <tr class="{{ empty($d['esito']) ? 'bg-red-50' : '' }}">
+                                    @php
+                                        $d = $input[$pi->id];
+                                        $hex = $pi->presidio->tipoEstintore?->colore?->hex ?? null;
+                                        $rowRgba = null;
+                                        if ($hex) {
+                                            $h = ltrim($hex, '#');
+                                            if (strlen($h) === 6) {
+                                                $r = hexdec(substr($h, 0, 2));
+                                                $g = hexdec(substr($h, 2, 2));
+                                                $b = hexdec(substr($h, 4, 2));
+                                                $rowRgba = "rgba($r, $g, $b, 0.06)";
+                                            }
+                                        }
+                                        $rowMissing = empty($d['esito']);
+                                    @endphp
+                                    <tr class="{{ $rowMissing ? 'bg-red-50' : '' }}"
+                                        style="{{ (!$rowMissing && $rowRgba) ? 'background-color: '.$rowRgba.';' : '' }}">
                                         <td class="p-2 font-mono">{{ $pi->presidio->progressivo }}</td>
                                         <td class="p-2"><input type="text" wire:model="input.{{ $pi->id }}.ubicazione" class="w-full border-gray-300 rounded px-2 py-1"></td>
                                         <td class="p-2">
@@ -212,8 +227,20 @@
                     'Porta' => 'bg-amber-100 text-amber-700',
                 ][$cat] ?? 'bg-gray-100 text-gray-700';
                 $bgClass = $nonVerificato ? 'bg-red-50' : 'bg-white';
+                $hex = $pi->presidio->tipoEstintore?->colore?->hex ?? null;
+                $cardRgba = null;
+                if ($hex) {
+                    $h = ltrim($hex, '#');
+                    if (strlen($h) === 6) {
+                        $r = hexdec(substr($h, 0, 2));
+                        $g = hexdec(substr($h, 2, 2));
+                        $b = hexdec(substr($h, 4, 2));
+                        $cardRgba = "rgba($r, $g, $b, 0.06)";
+                    }
+                }
             @endphp
-        <div class="border rounded shadow p-4 border-l-4 {{ $catBorder }} {{ $bgClass }}">
+        <div class="border rounded shadow p-4 border-l-4 {{ $catBorder }} {{ $bgClass }}"
+             style="{{ (!$nonVerificato && $cardRgba) ? 'background-color: '.$cardRgba.';' : '' }}">
             <div class="flex items-center justify-between mb-3">
                 <h3 class="text-md font-semibold text-gray-800">🧯 Presidio #{{ $pi->presidio->progressivo }}</h3>
                 <span class="text-xs px-2 py-0.5 rounded {{ $catBadge }}">{{ strtoupper($cat) }}</span>

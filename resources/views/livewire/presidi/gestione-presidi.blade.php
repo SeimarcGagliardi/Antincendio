@@ -132,8 +132,21 @@
                     @foreach($presidi as $index => $presidio)
                         @php
                             $rowHex = $presidio->tipoEstintore?->colore?->hex ?? null;
+                            $rowRgba = null;
+                            if ($rowHex) {
+                                $hex = ltrim($rowHex, '#');
+                                if (strlen($hex) === 6) {
+                                    $r = hexdec(substr($hex, 0, 2));
+                                    $g = hexdec(substr($hex, 2, 2));
+                                    $b = hexdec(substr($hex, 4, 2));
+                                    $rowRgba = "rgba($r, $g, $b, 0.06)";
+                                }
+                            }
+                            $isEditing = $presidio->id === $presidioInModifica;
                         @endphp
-                        <tr wire:key="presidio-{{ $presidio->id }}" class="even:bg-gray-50 align-middle {{ $presidio->id === $presidioInModifica ? 'bg-yellow-50' : '' }}">
+                        <tr wire:key="presidio-{{ $presidio->id }}"
+                            class="even:bg-gray-50 align-middle {{ $isEditing ? 'bg-yellow-50' : '' }}"
+                            style="{{ (!$isEditing && $rowRgba) ? 'background-color: '.$rowRgba.';' : '' }}">
                             {{-- # --}}
                             <td class="px-2 py-1 font-semibold text-center">
                                 <div class="flex items-center justify-center gap-2">

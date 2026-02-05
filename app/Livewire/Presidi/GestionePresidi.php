@@ -234,7 +234,7 @@ public function ricalcolaDate(int $id): void
     }
     public function getPresidiProperty()
     {
-        return Presidio::with('tipoEstintore')
+        return Presidio::with('tipoEstintore.colore')
             ->where('cliente_id', $this->cliente->id)
             ->where('sede_id', $this->sedeId)
             ->where('categoria', $this->categoriaAttiva)
@@ -400,7 +400,8 @@ public function ricalcolaDate(int $id): void
 
     public function render()
 {
-    $presidi = Presidio::where('cliente_id', $this->clienteId)->where('attivo','1')->where('categoria',$this->categoriaAttiva)
+    $presidi = Presidio::with('tipoEstintore.colore')
+        ->where('cliente_id', $this->clienteId)->where('attivo','1')->where('categoria',$this->categoriaAttiva)
         ->when($this->sedeId && $this->sedeId !== 'principale', fn($q) => $q->where('sede_id', $this->sedeId))
         ->orderBy('categoria')
         ->orderBy('progressivo_num')

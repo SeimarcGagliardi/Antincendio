@@ -269,7 +269,7 @@ class ImportaPresidiMassivo extends Component
     {
         preg_match_all('/\d+/', $name, $m);
         if (empty($m[0])) return null;
-        $raw = end($m[0]);
+        $raw = $m[0][0];
         if ($raw === '') return null;
         if (strlen($raw) > 4) {
             $raw = substr($raw, -4);
