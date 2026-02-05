@@ -57,7 +57,7 @@ class ImportPresidiDocxJob implements ShouldQueue
                 ->delete();
         }
 
-        if ($this->azione === 'skip_if_exists') {
+        if ($this->azione === 'skip_file') {
             $exists = \App\Models\Presidio::where('cliente_id', $this->clienteId)
                 ->when($this->sedeId === null, fn($q) => $q->whereNull('sede_id'))
                 ->when($this->sedeId !== null, fn($q) => $q->where('sede_id', $this->sedeId))
@@ -65,9 +65,9 @@ class ImportPresidiDocxJob implements ShouldQueue
             if ($exists) {
                 ImportMassivoFile::whereKey($this->importId)->update([
                     'status' => 'skipped',
-                    'error' => 'Presidi già presenti',
+                    'error' => 'Presidi già presenti (file saltato)',
                 ]);
-                Log::info('[IMPORT MASSIVO] Saltato (presidi già presenti)', [
+                Log::info('[IMPORT MASSIVO] Saltato (file)', [
                     'cliente_id' => $this->clienteId,
                     'sede_id' => $this->sedeId,
                     'path' => $this->relativePath,
@@ -77,7 +77,7 @@ class ImportPresidiDocxJob implements ShouldQueue
         }
 
         try {
-            $importer = new DocxPresidiImporter($this->clienteId, $this->sedeId);
+            $importer = new DocxPresidiImporter($this->clienteId, $this->sedeId, $this->azione);
             $res = $importer->importFromPath($fullPath);
             ImportMassivoFile::whereKey($this->importId)->update([
                 'status' => 'done',

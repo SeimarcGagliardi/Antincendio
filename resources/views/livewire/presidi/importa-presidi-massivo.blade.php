@@ -95,8 +95,9 @@
                                     @if(($r['status'] ?? '') === 'ok')
                                         <select wire:model.defer="fileRows.{{ $r['index'] }}.azione"
                                                 class="input input-bordered text-xs">
-                                            <option value="skip_if_exists">Salta se presenti</option>
+                                            <option value="skip_duplicates">Salta duplicati (mantieni esistenti)</option>
                                             <option value="overwrite">Sovrascrivi</option>
+                                            <option value="skip_file">Salta file se presenti</option>
                                         </select>
                                     @else
                                         —

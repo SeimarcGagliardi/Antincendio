@@ -17,14 +17,18 @@ class DocxPresidiImporter
 {
     private int $clienteId;
     private ?int $sedeId;
+    private string $azione;
     private array $mesiPreferiti = [];
     private ?\Illuminate\Support\Collection $tipiCache = null;
+    private array $existingKeys = [];
 
-    public function __construct(int $clienteId, ?int $sedeId = null)
+    public function __construct(int $clienteId, ?int $sedeId = null, string $azione = 'skip_duplicates')
     {
         $this->clienteId = $clienteId;
         $this->sedeId = $sedeId;
+        $this->azione = $azione;
         $this->mesiPreferiti = $this->caricaMesiPreferiti();
+        $this->loadExistingKeys();
     }
 
     public function importFromPath(string $path): array
@@ -101,6 +105,10 @@ class DocxPresidiImporter
                     $contratto = $r['tipo_contratto'] ?? '';
 
                     if ($tableType === 'idranti') {
+                        if ($this->shouldSkipExisting('Idrante', (int)$numero)) {
+                            $saltati++;
+                            continue;
+                        }
                         $note = $r['note'] ?? null;
                         $idrTipo = null;
                         $idrLen  = null;
@@ -134,11 +142,16 @@ class DocxPresidiImporter
                                 'note'              => $note,
                             ]
                         );
+                        $this->markExisting('Idrante', (int)$numero);
                         $importati++;
                         continue;
                     }
 
                     if ($tableType === 'porte') {
+                        if ($this->shouldSkipExisting('Porta', (int)$numero)) {
+                            $saltati++;
+                            continue;
+                        }
                         $note = $r['note'] ?? null;
                         $portaTipo = $r['porta_tipo'] ?? null;
                         $flag1 = !empty($r['anomalia_maniglione'] ?? null);
@@ -164,6 +177,7 @@ class DocxPresidiImporter
                                 'note'              => $note,
                             ]
                         );
+                        $this->markExisting('Porta', (int)$numero);
                         $importati++;
                         continue;
                     }
@@ -211,6 +225,11 @@ class DocxPresidiImporter
 
                     $sedeId = $this->resolveSedeId();
 
+                    if ($this->shouldSkipExisting('Estintore', (int)$numero)) {
+                        $saltati++;
+                        continue;
+                    }
+
                     Presidio::updateOrCreate(
                         [
                             'cliente_id' => $this->clienteId,
@@ -239,12 +258,43 @@ class DocxPresidiImporter
                         ]
                     );
 
+                    $this->markExisting('Estintore', (int)$numero);
                     $importati++;
                 }
             }
         }
 
         return ['importati' => $importati, 'saltati' => $saltati];
+    }
+
+    private function loadExistingKeys(): void
+    {
+        if ($this->azione !== 'skip_duplicates') return;
+
+        $rows = Presidio::query()
+            ->select('categoria', 'progressivo')
+            ->where('cliente_id', $this->clienteId)
+            ->when($this->sedeId === null, fn($q) => $q->whereNull('sede_id'))
+            ->when($this->sedeId !== null, fn($q) => $q->where('sede_id', $this->sedeId))
+            ->get();
+
+        foreach ($rows as $r) {
+            $cat = (string)$r->categoria;
+            $prog = (int)$r->progressivo;
+            $this->existingKeys[$cat][$prog] = true;
+        }
+    }
+
+    private function shouldSkipExisting(string $categoria, int $progressivo): bool
+    {
+        if ($this->azione !== 'skip_duplicates') return false;
+        return !empty($this->existingKeys[$categoria][$progressivo]);
+    }
+
+    private function markExisting(string $categoria, int $progressivo): void
+    {
+        if ($this->azione !== 'skip_duplicates') return;
+        $this->existingKeys[$categoria][$progressivo] = true;
     }
 
     private function resolveSedeId(): ?int

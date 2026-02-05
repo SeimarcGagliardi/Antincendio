@@ -79,7 +79,7 @@ class ImportaPresidiMassivo extends Component
                     ->all();
                 $row['sedi'] = $sedi;
                 $row['sede_id'] = count($sedi) ? $sedi[0]['id'] : 'principal';
-                $row['azione'] = 'skip_if_exists';
+                $row['azione'] = 'skip_duplicates';
 
                 $this->clientiInput[$cliente->id] = $this->clientiInput[$cliente->id] ?? [
                     'nome' => $cliente->nome,
@@ -174,7 +174,7 @@ class ImportaPresidiMassivo extends Component
                 'sede_id' => $sedeId,
                 'original_name' => $row['name'],
                 'stored_path' => $path,
-                'azione' => $row['azione'] ?? 'skip_if_exists',
+                'azione' => $row['azione'] ?? 'skip_duplicates',
                 'status' => 'queued',
             ]);
             ImportPresidiDocxJob::dispatch(
@@ -182,7 +182,7 @@ class ImportaPresidiMassivo extends Component
                 $path,
                 (int)$row['cliente_id'],
                 $sedeId,
-                $row['azione'] ?? 'skip_if_exists'
+                $row['azione'] ?? 'skip_duplicates'
             );
         }
 
