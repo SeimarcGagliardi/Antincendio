@@ -27,12 +27,12 @@ return new class extends Migration
             DB::statement("ALTER TABLE {$table} MODIFY progressivo VARCHAR(30)");
         }
 
-        Schema::table($table, function (Blueprint $table) use ($table) {
+        Schema::table($table, function (Blueprint $schemaTable) use ($table) {
             if (!Schema::hasColumn($table, 'progressivo_num')) {
-                $table->unsignedInteger('progressivo_num')->nullable()->after('progressivo');
+                $schemaTable->unsignedInteger('progressivo_num')->nullable()->after('progressivo');
             }
             if (!Schema::hasColumn($table, 'progressivo_suffix')) {
-                $table->string('progressivo_suffix', 20)->nullable()->after('progressivo_num');
+                $schemaTable->string('progressivo_suffix', 20)->nullable()->after('progressivo_num');
             }
         });
 
@@ -43,12 +43,12 @@ return new class extends Migration
     {
         if (!Schema::hasTable($table)) return;
 
-        Schema::table($table, function (Blueprint $table) {
+        Schema::table($table, function (Blueprint $schemaTable) use ($table) {
             if (Schema::hasColumn($table, 'progressivo_suffix')) {
-                $table->dropColumn('progressivo_suffix');
+                $schemaTable->dropColumn('progressivo_suffix');
             }
             if (Schema::hasColumn($table, 'progressivo_num')) {
-                $table->dropColumn('progressivo_num');
+                $schemaTable->dropColumn('progressivo_num');
             }
         });
 
