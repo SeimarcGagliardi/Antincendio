@@ -226,25 +226,34 @@
         if (window.statisticheChart) window.statisticheChart.destroy();
 
         if (window.Chart) {
-            Chart.defaults.color = '#334155';
+            Chart.defaults.color = '#1f2937';
+            Chart.defaults.borderColor = '#e2e8f0';
             if (Chart.defaults.plugins && Chart.defaults.plugins.legend && Chart.defaults.plugins.legend.labels) {
-                Chart.defaults.plugins.legend.labels.color = '#334155';
+                Chart.defaults.plugins.legend.labels.color = '#1f2937';
             }
             if (Chart.defaults.scale && Chart.defaults.scale.ticks) {
-                Chart.defaults.scale.ticks.color = '#334155';
+                Chart.defaults.scale.ticks.color = '#1f2937';
             }
         }
 
         const options = {
             responsive: true,
             maintainAspectRatio: false,
+            color: '#1f2937',
             plugins: {
                 legend: {
                     position: cfg.type === 'doughnut' ? 'bottom' : 'top',
                     labels: {
-                        color: '#334155',
+                        color: '#1f2937',
                     },
-                }
+                },
+                tooltip: {
+                    titleColor: '#0f172a',
+                    bodyColor: '#0f172a',
+                    backgroundColor: '#f8fafc',
+                    borderColor: '#e2e8f0',
+                    borderWidth: 1,
+                },
             },
             onClick: (event, elements) => {
                 if (!elements || !elements.length) return;
@@ -267,8 +276,8 @@
         };
         if (cfg.type !== 'doughnut') {
             options.scales = {
-                x: { ticks: { color: '#334155' } },
-                y: { beginAtZero: true, ticks: { precision: 0, color: '#334155' } },
+                x: { ticks: { color: '#1f2937' }, grid: { color: '#e2e8f0' } },
+                y: { beginAtZero: true, ticks: { precision: 0, color: '#1f2937' }, grid: { color: '#e2e8f0' } },
             };
         }
         if (cfg.axis) {
