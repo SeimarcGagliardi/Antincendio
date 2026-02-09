@@ -2,11 +2,12 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Pivot;
 
-class InterventoTecnico extends Model
+class InterventoTecnico extends Pivot
 {
     protected $table = 'intervento_tecnico';
+    public $incrementing = true;
 
     protected $fillable = [
         'intervento_id',
