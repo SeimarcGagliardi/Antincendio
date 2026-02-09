@@ -4,10 +4,9 @@
     </h1>
 
     <datalist id="marca-serbatoio-opzioni">
-        <option value="MB"></option>
-        <option value="ABM"></option>
-        <option value="SISTEMI"></option>
-        <option value="ALTRO"></option>
+        @foreach($marcaSuggestions as $marca)
+            <option value="{{ $marca }}"></option>
+        @endforeach
     </datalist>
 
     {{-- Switch Vista --}}
@@ -37,7 +36,7 @@
 
             <div>
                 <label class="block text-sm font-medium text-gray-700">Tipo Estintore</label>
-                <select wire:model.defer="nuovoPresidio.tipo_estintore_id" class="w-full border-gray-300 rounded px-2 py-1">
+                <select wire:model="nuovoPresidio.tipo_estintore_id" wire:change="aggiornaPreviewNuovo" class="w-full border-gray-300 rounded px-2 py-1">
                     <option value="">Seleziona tipo</option>
                     @foreach($tipiEstintori as $tipo)
                         <option value="{{ $tipo->id }}">{{ $tipo->sigla }}</option>
@@ -47,17 +46,20 @@
 
             <div>
                 <label class="block text-sm font-medium text-gray-700">Data Serbatoio</label>
-                <input type="date" wire:model.defer="nuovoPresidio.data_serbatoio" class="w-full border-gray-300 rounded px-2 py-1">
+                <input type="date" wire:model="nuovoPresidio.data_serbatoio" wire:change="aggiornaPreviewNuovo" class="w-full border-gray-300 rounded px-2 py-1">
             </div>
 
             <div>
                 <label class="block text-sm font-medium text-gray-700">Marca Serbatoio</label>
-                <input type="text" list="marca-serbatoio-opzioni" wire:model.defer="nuovoPresidio.marca_serbatoio" class="w-full border-gray-300 rounded px-2 py-1" placeholder="MB / altro">
+                <div class="flex items-center gap-2">
+                    <input type="text" list="marca-serbatoio-opzioni" wire:model="nuovoPresidio.marca_serbatoio" wire:change="aggiornaPreviewNuovo" class="w-full border-gray-300 rounded px-2 py-1" placeholder="MB / altro">
+                    <button type="button" wire:click="setMarcaMbNuovo" class="px-2 py-1 text-xs rounded border border-gray-300 hover:bg-gray-50">MB</button>
+                </div>
             </div>
 
             <div>
                 <label class="block text-sm font-medium text-gray-700">Ultima Revisione</label>
-                <input type="date" wire:model.defer="nuovoPresidio.data_ultima_revisione" class="w-full border-gray-300 rounded px-2 py-1">
+                <input type="date" wire:model="nuovoPresidio.data_ultima_revisione" wire:change="aggiornaPreviewNuovo" class="w-full border-gray-300 rounded px-2 py-1">
             </div>
 
             <div>
@@ -80,6 +82,16 @@
                 </label>
             </div>
     </div>
+    @if(!empty($previewNuovo))
+        @php $p = $previewNuovo; @endphp
+        <div class="mt-2 text-xs bg-gray-50 border border-gray-200 rounded p-2 text-gray-700">
+            <span class="font-semibold">Preview scadenze:</span>
+            Revisione: <strong>{{ $p['revisione'] ? \Carbon\Carbon::parse($p['revisione'])->format('d/m/Y') : '—' }}</strong>,
+            Collaudo: <strong>{{ $p['collaudo'] ? \Carbon\Carbon::parse($p['collaudo'])->format('d/m/Y') : '—' }}</strong>,
+            Fine vita: <strong>{{ $p['fine_vita'] ? \Carbon\Carbon::parse($p['fine_vita'])->format('d/m/Y') : '—' }}</strong>,
+            Sostituzione: <strong>{{ $p['sostituzione'] ? \Carbon\Carbon::parse($p['sostituzione'])->format('d/m/Y') : '—' }}</strong>
+        </div>
+    @endif
     <div class="flex justify-end mt-2">
         <button wire:click="salvaNuovoPresidio" class="px-4 py-2 bg-blue-600 text-white rounded shadow text-sm hover:bg-blue-700">
             💾 Salva nuovo presidio
@@ -170,19 +182,32 @@
                                                 </button>
                                                 @if ($d['sostituzione'])
                                                     <div class="mt-2 space-y-1">
-                                                        <select wire:model="input.{{ $pi->id }}.nuovo_tipo_estintore_id" class="w-full border-gray-300 rounded px-2 py-1">
+                                                        <select wire:model="input.{{ $pi->id }}.nuovo_tipo_estintore_id" wire:change="aggiornaPreviewSostituzione({{ $pi->id }})" class="w-full border-gray-300 rounded px-2 py-1">
                                                             <option value="">Tipo Estintore</option>
                                                             @foreach ($tipiEstintori as $tipo)
                                                                 <option value="{{ $tipo->id }}">{{ $tipo->sigla }}</option>
                                                             @endforeach
                                                         </select>
-                                                        <input type="date" wire:model="input.{{ $pi->id }}.nuova_data_serbatoio" class="w-full border-gray-300 rounded px-2 py-1">
-                                                        <input type="text" list="marca-serbatoio-opzioni" wire:model="input.{{ $pi->id }}.nuova_marca_serbatoio" class="w-full border-gray-300 rounded px-2 py-1" placeholder="Marca serbatoio (MB / altro)">
-                                                        <input type="date" wire:model="input.{{ $pi->id }}.nuova_data_ultima_revisione" class="w-full border-gray-300 rounded px-2 py-1" placeholder="Ultima revisione">
+                                                        <input type="date" wire:model="input.{{ $pi->id }}.nuova_data_serbatoio" wire:change="aggiornaPreviewSostituzione({{ $pi->id }})" class="w-full border-gray-300 rounded px-2 py-1">
+                                                        <div class="flex items-center gap-2">
+                                                            <input type="text" list="marca-serbatoio-opzioni" wire:model="input.{{ $pi->id }}.nuova_marca_serbatoio" wire:change="aggiornaPreviewSostituzione({{ $pi->id }})" class="w-full border-gray-300 rounded px-2 py-1" placeholder="Marca serbatoio (MB / altro)">
+                                                            <button type="button" wire:click="setMarcaMbSostituzione({{ $pi->id }})" class="px-2 py-1 text-xs rounded border border-gray-300 hover:bg-gray-50">MB</button>
+                                                        </div>
+                                                        <input type="date" wire:model="input.{{ $pi->id }}.nuova_data_ultima_revisione" wire:change="aggiornaPreviewSostituzione({{ $pi->id }})" class="w-full border-gray-300 rounded px-2 py-1" placeholder="Ultima revisione">
                                                         <label class="flex gap-1 items-center text-sm">
                                                             <input type="checkbox" wire:model="input.{{ $pi->id }}.usa_ritiro" class="border-gray-300">
                                                             Usa presidio da ritiri
                                                         </label>
+                                                        @php $prev = $previewSostituzione[$pi->id] ?? null; @endphp
+                                                        @if(!empty($prev))
+                                                            <div class="text-xs bg-gray-50 border border-gray-200 rounded p-2 text-gray-700">
+                                                                <span class="font-semibold">Preview scadenze:</span>
+                                                                Revisione: <strong>{{ $prev['revisione'] ? \Carbon\Carbon::parse($prev['revisione'])->format('d/m/Y') : '—' }}</strong>,
+                                                                Collaudo: <strong>{{ $prev['collaudo'] ? \Carbon\Carbon::parse($prev['collaudo'])->format('d/m/Y') : '—' }}</strong>,
+                                                                Fine vita: <strong>{{ $prev['fine_vita'] ? \Carbon\Carbon::parse($prev['fine_vita'])->format('d/m/Y') : '—' }}</strong>,
+                                                                Sostituzione: <strong>{{ $prev['sostituzione'] ? \Carbon\Carbon::parse($prev['sostituzione'])->format('d/m/Y') : '—' }}</strong>
+                                                            </div>
+                                                        @endif
                                                         <button wire:click="sostituisciPresidio({{ $pi->id }})" class="bg-blue-600 text-white px-3 py-1 rounded text-sm mt-2">
                                                             Conferma Sostituzione
                                                         </button>
@@ -333,17 +358,30 @@
 
                             @if ($d['sostituzione'] ?? false)
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3">
-                                    <select wire:model="input.{{ $pi->id }}.nuovo_tipo_estintore_id" class="w-full text-sm border-gray-300 rounded px-2 py-1">
+                                    <select wire:model="input.{{ $pi->id }}.nuovo_tipo_estintore_id" wire:change="aggiornaPreviewSostituzione({{ $pi->id }})" class="w-full text-sm border-gray-300 rounded px-2 py-1">
                                         <option value="">Tipo Estintore</option>
                                         @foreach ($tipiEstintori as $tipo)
                                             <option value="{{ $tipo->id }}">{{ $tipo->sigla }}</option>
                                         @endforeach
                                     </select>
 
-                                    <input type="date" wire:model="input.{{ $pi->id }}.nuova_data_serbatoio" class="w-full text-sm border-gray-300 rounded px-2 py-1">
-                                    <input type="text" list="marca-serbatoio-opzioni" wire:model="input.{{ $pi->id }}.nuova_marca_serbatoio" class="w-full text-sm border-gray-300 rounded px-2 py-1" placeholder="Marca serbatoio (MB / altro)">
-                                    <input type="date" wire:model="input.{{ $pi->id }}.nuova_data_ultima_revisione" class="w-full text-sm border-gray-300 rounded px-2 py-1">
+                                    <input type="date" wire:model="input.{{ $pi->id }}.nuova_data_serbatoio" wire:change="aggiornaPreviewSostituzione({{ $pi->id }})" class="w-full text-sm border-gray-300 rounded px-2 py-1">
+                                    <div class="flex items-center gap-2">
+                                        <input type="text" list="marca-serbatoio-opzioni" wire:model="input.{{ $pi->id }}.nuova_marca_serbatoio" wire:change="aggiornaPreviewSostituzione({{ $pi->id }})" class="w-full text-sm border-gray-300 rounded px-2 py-1" placeholder="Marca serbatoio (MB / altro)">
+                                        <button type="button" wire:click="setMarcaMbSostituzione({{ $pi->id }})" class="px-2 py-1 text-xs rounded border border-gray-300 hover:bg-gray-50">MB</button>
+                                    </div>
+                                    <input type="date" wire:model="input.{{ $pi->id }}.nuova_data_ultima_revisione" wire:change="aggiornaPreviewSostituzione({{ $pi->id }})" class="w-full text-sm border-gray-300 rounded px-2 py-1">
                                 </div>
+                                @php $prev = $previewSostituzione[$pi->id] ?? null; @endphp
+                                @if(!empty($prev))
+                                    <div class="mt-2 text-xs bg-gray-50 border border-gray-200 rounded p-2 text-gray-700">
+                                        <span class="font-semibold">Preview scadenze:</span>
+                                        Revisione: <strong>{{ $prev['revisione'] ? \Carbon\Carbon::parse($prev['revisione'])->format('d/m/Y') : '—' }}</strong>,
+                                        Collaudo: <strong>{{ $prev['collaudo'] ? \Carbon\Carbon::parse($prev['collaudo'])->format('d/m/Y') : '—' }}</strong>,
+                                        Fine vita: <strong>{{ $prev['fine_vita'] ? \Carbon\Carbon::parse($prev['fine_vita'])->format('d/m/Y') : '—' }}</strong>,
+                                        Sostituzione: <strong>{{ $prev['sostituzione'] ? \Carbon\Carbon::parse($prev['sostituzione'])->format('d/m/Y') : '—' }}</strong>
+                                    </div>
+                                @endif
 
                                 <div class="mt-2">
                                     <label class="text-sm">Stato del presidio ritirato</label>

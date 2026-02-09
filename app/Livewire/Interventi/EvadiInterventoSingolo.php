@@ -20,6 +20,9 @@ class EvadiInterventoSingolo extends Component
     public $input = [];
     public $vistaSchede = true;
     public $durataEffettiva;
+    public array $marcaSuggestions = [];
+    public array $previewSostituzione = [];
+    public array $previewNuovo = [];
 
     public $formNuovoVisibile = false;
     public $nuovoPresidio = [];
@@ -56,6 +59,7 @@ public function apriFormNuovoPresidio()
         'note' => '',
         'usa_ritiro' => false, // nuovo flag
     ];
+    $this->previewNuovo = [];
     
 }
 
@@ -86,7 +90,7 @@ public function salvaNuovoPresidio()
         'ubicazione' => $this->nuovoPresidio['ubicazione'],
         'tipo_estintore_id' => $this->nuovoPresidio['tipo_estintore_id'],
         'data_serbatoio' => $this->nuovoPresidio['data_serbatoio'],
-        'marca_serbatoio' => $this->nuovoPresidio['marca_serbatoio'] ?? null,
+        'marca_serbatoio' => $this->normalizeMarca($this->nuovoPresidio['marca_serbatoio'] ?? null),
         'data_ultima_revisione' => $this->nuovoPresidio['data_ultima_revisione'] ?? null,
         'note' => $this->nuovoPresidio['note'],
     ]);
@@ -132,6 +136,7 @@ public function salvaNuovoPresidio()
     {
         $this->intervento = $intervento->load('cliente', 'sede', 'presidiIntervento.presidio.tipoEstintore.colore');
         $this->durataEffettiva = $this->intervento->durata_effettiva;
+        $this->marcaSuggestions = $this->caricaMarcheSuggerite();
 
         // Se non esistono ancora presidi_intervento, generarli
         if ($this->intervento->presidiIntervento->isEmpty()) {
@@ -296,7 +301,7 @@ public function salvaNuovoPresidio()
             'ubicazione' => $vecchio->ubicazione,
             'tipo_estintore_id' => $dati['nuovo_tipo_estintore_id'],
             'data_serbatoio' => $dati['nuova_data_serbatoio'],
-            'marca_serbatoio' => $dati['nuova_marca_serbatoio'] ?? $vecchio->marca_serbatoio,
+            'marca_serbatoio' => $this->normalizeMarca($dati['nuova_marca_serbatoio'] ?? $vecchio->marca_serbatoio),
             'data_ultima_revisione' => $dati['nuova_data_ultima_revisione'] ?? null,
             'mesi_visita' => $vecchio->mesi_visita,
         ]);
@@ -374,7 +379,7 @@ public function salvaNuovoPresidio()
                 'ubicazione' => $vecchio->ubicazione,
                 'tipo_estintore_id' => $dati['nuovo_tipo_estintore_id'],
                 'data_serbatoio' => $dati['nuova_data_serbatoio'],
-                'marca_serbatoio' => $dati['nuova_marca_serbatoio'] ?? $vecchio->marca_serbatoio,
+                'marca_serbatoio' => $this->normalizeMarca($dati['nuova_marca_serbatoio'] ?? $vecchio->marca_serbatoio),
                 'data_ultima_revisione' => $dati['nuova_data_ultima_revisione'] ?? null,
                 'mesi_visita' => $vecchio->mesi_visita,
             ]);
@@ -403,6 +408,99 @@ public function salvaNuovoPresidio()
 
         $pi->save();
         $this->messaggioSuccesso = 'Presidio aggiornato correttamente.';
+    }
+
+    public function setMarcaMbSostituzione(int $id): void
+    {
+        if (!isset($this->input[$id])) {
+            return;
+        }
+        $this->input[$id]['nuova_marca_serbatoio'] = 'MB';
+        $this->aggiornaPreviewSostituzione($id);
+    }
+
+    public function setMarcaMbNuovo(): void
+    {
+        $this->nuovoPresidio['marca_serbatoio'] = 'MB';
+        $this->aggiornaPreviewNuovo();
+    }
+
+    public function aggiornaPreviewSostituzione(int $id): void
+    {
+        $dati = $this->input[$id] ?? [];
+        $this->previewSostituzione[$id] = $this->calcolaPreviewScadenze(
+            $dati['nuovo_tipo_estintore_id'] ?? null,
+            $dati['nuova_data_serbatoio'] ?? null,
+            $dati['nuova_data_ultima_revisione'] ?? null,
+            $dati['nuova_marca_serbatoio'] ?? null
+        );
+    }
+
+    public function aggiornaPreviewNuovo(): void
+    {
+        $dati = $this->nuovoPresidio ?? [];
+        $this->previewNuovo = $this->calcolaPreviewScadenze(
+            $dati['tipo_estintore_id'] ?? null,
+            $dati['data_serbatoio'] ?? null,
+            $dati['data_ultima_revisione'] ?? null,
+            $dati['marca_serbatoio'] ?? null
+        );
+    }
+
+    private function calcolaPreviewScadenze($tipoId, $dataSerb, $ultimaRev, $marca): ?array
+    {
+        if (!$tipoId || (!$dataSerb && !$ultimaRev)) {
+            return null;
+        }
+
+        $tipo = TipoEstintore::with('classificazione')->find($tipoId);
+        if (!$tipo) {
+            return null;
+        }
+
+        $tmp = new Presidio();
+        $tmp->tipo_estintore_id = $tipoId;
+        $tmp->data_serbatoio = $dataSerb;
+        $tmp->data_ultima_revisione = $ultimaRev;
+        $tmp->marca_serbatoio = $this->normalizeMarca($marca);
+
+        $tmp->setRelation('tipoEstintore', $tipo);
+        $tmp->setRelation('cliente', $this->intervento->cliente ?? new \App\Models\Cliente());
+        $tmp->setRelation('sede', $this->intervento->sede ?? new \App\Models\Sede());
+
+        $tmp->calcolaScadenze();
+
+        return [
+            'revisione' => $tmp->data_revisione,
+            'collaudo' => $tmp->data_collaudo,
+            'fine_vita' => $tmp->data_fine_vita,
+            'sostituzione' => $tmp->data_sostituzione,
+        ];
+    }
+
+    private function caricaMarcheSuggerite(): array
+    {
+        $marche = Presidio::query()
+            ->whereNotNull('marca_serbatoio')
+            ->pluck('marca_serbatoio')
+            ->map(fn ($m) => $this->normalizeMarca($m))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if (!$marche->contains('MB')) {
+            $marche->prepend('MB');
+        } else {
+            $marche = collect(['MB'])->merge($marche->reject(fn ($m) => $m === 'MB'));
+        }
+
+        return $marche->values()->all();
+    }
+
+    private function normalizeMarca(?string $marca): ?string
+    {
+        $marca = trim((string) $marca);
+        return $marca === '' ? null : mb_strtoupper($marca);
     }
 
 
