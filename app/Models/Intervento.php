@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\InterventoTecnico;
 
 class Intervento extends Model
 {
@@ -35,6 +36,7 @@ class Intervento extends Model
     public function tecnici()
     {
         return $this->belongsToMany(User::class, 'intervento_tecnico')
+            ->using(InterventoTecnico::class)
             ->withPivot('started_at', 'ended_at', 'scheduled_start_at', 'scheduled_end_at');
     }
     public function presidiIntervento()

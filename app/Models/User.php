@@ -9,6 +9,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\HasApiTokens;
+use App\Models\InterventoTecnico;
 
 class User extends Authenticatable
 {
@@ -67,6 +68,7 @@ class User extends Authenticatable
     public function interventi()
     {
         return $this->belongsToMany(Intervento::class, 'intervento_tecnico')
+            ->using(InterventoTecnico::class)
             ->withPivot('started_at', 'ended_at', 'scheduled_start_at', 'scheduled_end_at');
     }
 

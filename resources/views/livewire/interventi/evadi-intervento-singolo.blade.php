@@ -6,13 +6,15 @@
     @php
         $currentTecnico = $intervento->tecnici->firstWhere('id', auth()->id());
         $pivot = $currentTecnico?->pivot;
+        $start = $pivot?->started_at ? \Carbon\Carbon::parse($pivot->started_at) : null;
+        $end = $pivot?->ended_at ? \Carbon\Carbon::parse($pivot->ended_at) : null;
     @endphp
     @if($currentTecnico)
         <div class="flex items-center gap-3 text-sm bg-white border rounded p-3 shadow-sm">
             <div class="font-semibold text-gray-700">⏱ Timer intervento</div>
             <div class="text-xs text-gray-600">
-                Inizio: <span class="font-medium">{{ $pivot?->started_at ? $pivot->started_at->format('H:i') : '—' }}</span>
-                · Fine: <span class="font-medium">{{ $pivot?->ended_at ? $pivot->ended_at->format('H:i') : '—' }}</span>
+                Inizio: <span class="font-medium">{{ $start ? $start->format('H:i') : '—' }}</span>
+                · Fine: <span class="font-medium">{{ $end ? $end->format('H:i') : '—' }}</span>
             </div>
             <div class="ml-auto flex items-center gap-2">
                 <button
