@@ -3,6 +3,13 @@
         🛠 Evadi Intervento: <span class="text-gray-800">{{ $intervento->cliente->nome }}</span>
     </h1>
 
+    <datalist id="marca-serbatoio-opzioni">
+        <option value="MB"></option>
+        <option value="ABM"></option>
+        <option value="SISTEMI"></option>
+        <option value="ALTRO"></option>
+    </datalist>
+
     {{-- Switch Vista --}}
     <div class="flex items-center gap-3">
         <label class="font-medium text-sm">Vista:</label>
@@ -41,6 +48,16 @@
             <div>
                 <label class="block text-sm font-medium text-gray-700">Data Serbatoio</label>
                 <input type="date" wire:model.defer="nuovoPresidio.data_serbatoio" class="w-full border-gray-300 rounded px-2 py-1">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Marca Serbatoio</label>
+                <input type="text" list="marca-serbatoio-opzioni" wire:model.defer="nuovoPresidio.marca_serbatoio" class="w-full border-gray-300 rounded px-2 py-1" placeholder="MB / altro">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Ultima Revisione</label>
+                <input type="date" wire:model.defer="nuovoPresidio.data_ultima_revisione" class="w-full border-gray-300 rounded px-2 py-1">
             </div>
 
             <div>
@@ -160,6 +177,8 @@
                                                             @endforeach
                                                         </select>
                                                         <input type="date" wire:model="input.{{ $pi->id }}.nuova_data_serbatoio" class="w-full border-gray-300 rounded px-2 py-1">
+                                                        <input type="text" list="marca-serbatoio-opzioni" wire:model="input.{{ $pi->id }}.nuova_marca_serbatoio" class="w-full border-gray-300 rounded px-2 py-1" placeholder="Marca serbatoio (MB / altro)">
+                                                        <input type="date" wire:model="input.{{ $pi->id }}.nuova_data_ultima_revisione" class="w-full border-gray-300 rounded px-2 py-1" placeholder="Ultima revisione">
                                                         <label class="flex gap-1 items-center text-sm">
                                                             <input type="checkbox" wire:model="input.{{ $pi->id }}.usa_ritiro" class="border-gray-300">
                                                             Usa presidio da ritiri
@@ -322,6 +341,8 @@
                                     </select>
 
                                     <input type="date" wire:model="input.{{ $pi->id }}.nuova_data_serbatoio" class="w-full text-sm border-gray-300 rounded px-2 py-1">
+                                    <input type="text" list="marca-serbatoio-opzioni" wire:model="input.{{ $pi->id }}.nuova_marca_serbatoio" class="w-full text-sm border-gray-300 rounded px-2 py-1" placeholder="Marca serbatoio (MB / altro)">
+                                    <input type="date" wire:model="input.{{ $pi->id }}.nuova_data_ultima_revisione" class="w-full text-sm border-gray-300 rounded px-2 py-1">
                                 </div>
 
                                 <div class="mt-2">

@@ -50,6 +50,8 @@ public function apriFormNuovoPresidio()
         'ubicazione' => '',
         'tipo_estintore_id' => null,
         'data_serbatoio' => null,
+        'marca_serbatoio' => null,
+        'data_ultima_revisione' => null,
         'categoria' => 'Estintore',
         'note' => '',
         'usa_ritiro' => false, // nuovo flag
@@ -84,6 +86,8 @@ public function salvaNuovoPresidio()
         'ubicazione' => $this->nuovoPresidio['ubicazione'],
         'tipo_estintore_id' => $this->nuovoPresidio['tipo_estintore_id'],
         'data_serbatoio' => $this->nuovoPresidio['data_serbatoio'],
+        'marca_serbatoio' => $this->nuovoPresidio['marca_serbatoio'] ?? null,
+        'data_ultima_revisione' => $this->nuovoPresidio['data_ultima_revisione'] ?? null,
         'note' => $this->nuovoPresidio['note'],
     ]);
 
@@ -102,19 +106,21 @@ public function salvaNuovoPresidio()
     $this->intervento->load('presidiIntervento.presidio.tipoEstintore.colore');
     
     // Inizializzazione sicura input
-    $this->input[$pi->id] = [
-        'ubicazione' => $presidio->ubicazione,
-        'note' => null,
-        'esito' => 'non_verificato',
-        'anomalie' => [],
-        'sostituito_con' => 0,
-        'sostituzione' => false,
-        'nuovo_tipo_estintore_id' => null,
-        'nuova_data_serbatoio' => null,
-        'usa_ritiro' => false,
-        'tipo_estintore_sigla' => optional($presidio->tipoEstintore)->sigla ?? '-',
-        'deve_ritirare' => $this->verificaRitiroObbligato($presidio),
-    ];
+        $this->input[$pi->id] = [
+            'ubicazione' => $presidio->ubicazione,
+            'note' => null,
+            'esito' => 'non_verificato',
+            'anomalie' => [],
+            'sostituito_con' => 0,
+            'sostituzione' => false,
+            'nuovo_tipo_estintore_id' => null,
+            'nuova_data_serbatoio' => null,
+            'nuova_marca_serbatoio' => $presidio->marca_serbatoio,
+            'nuova_data_ultima_revisione' => $presidio->data_ultima_revisione,
+            'usa_ritiro' => false,
+            'tipo_estintore_sigla' => optional($presidio->tipoEstintore)->sigla ?? '-',
+            'deve_ritirare' => $this->verificaRitiroObbligato($presidio),
+        ];
 
     $this->formNuovoVisibile = false;
     $this->messaggioSuccesso = 'Nuovo presidio aggiunto correttamente.';
@@ -155,19 +161,21 @@ public function salvaNuovoPresidio()
         
             $deveEssereRitirato = $this->verificaRitiroObbligato($presidio);
         
-            $this->input[$pi->id] = [
-                'ubicazione' => $presidio->ubicazione,
-                'note' => $pi->note,
-                'esito' => $pi->esito ?? 'non_verificato',
-                'anomalie' => is_array($pi->anomalie) ? $pi->anomalie : [],
-                'sostituito_con' => Presidio::find($pi->sostituito_con_presidio_id) ?? 0,
-                'sostituzione' => false,
-                'nuovo_tipo_estintore_id' => null,
-                'nuova_data_serbatoio' => null,
-                'usa_ritiro' => $pi->usa_ritiro ?? false,
-                'tipo_estintore_sigla' => optional($presidio->tipoEstintore)->sigla ?? '-',
-                'deve_ritirare' => $deveEssereRitirato,
-            ];
+        $this->input[$pi->id] = [
+            'ubicazione' => $presidio->ubicazione,
+            'note' => $pi->note,
+            'esito' => $pi->esito ?? 'non_verificato',
+            'anomalie' => is_array($pi->anomalie) ? $pi->anomalie : [],
+            'sostituito_con' => Presidio::find($pi->sostituito_con_presidio_id) ?? 0,
+            'sostituzione' => false,
+            'nuovo_tipo_estintore_id' => null,
+            'nuova_data_serbatoio' => null,
+            'nuova_marca_serbatoio' => $presidio->marca_serbatoio,
+            'nuova_data_ultima_revisione' => $presidio->data_ultima_revisione,
+            'usa_ritiro' => $pi->usa_ritiro ?? false,
+            'tipo_estintore_sigla' => optional($presidio->tipoEstintore)->sigla ?? '-',
+            'deve_ritirare' => $deveEssereRitirato,
+        ];
         }
     }
     protected function verificaRitiroObbligato(Presidio $presidio): bool
@@ -288,6 +296,8 @@ public function salvaNuovoPresidio()
             'ubicazione' => $vecchio->ubicazione,
             'tipo_estintore_id' => $dati['nuovo_tipo_estintore_id'],
             'data_serbatoio' => $dati['nuova_data_serbatoio'],
+            'marca_serbatoio' => $dati['nuova_marca_serbatoio'] ?? $vecchio->marca_serbatoio,
+            'data_ultima_revisione' => $dati['nuova_data_ultima_revisione'] ?? null,
             'mesi_visita' => $vecchio->mesi_visita,
         ]);
 
@@ -364,6 +374,8 @@ public function salvaNuovoPresidio()
                 'ubicazione' => $vecchio->ubicazione,
                 'tipo_estintore_id' => $dati['nuovo_tipo_estintore_id'],
                 'data_serbatoio' => $dati['nuova_data_serbatoio'],
+                'marca_serbatoio' => $dati['nuova_marca_serbatoio'] ?? $vecchio->marca_serbatoio,
+                'data_ultima_revisione' => $dati['nuova_data_ultima_revisione'] ?? null,
                 'mesi_visita' => $vecchio->mesi_visita,
             ]);
 
