@@ -20,10 +20,16 @@ class EvadiInterventi extends Component
 
     public function caricaInterventi()
     {
-        $this->interventi = \App\Models\Intervento::with('cliente', 'sede')
-            ->whereDate('data_intervento', $this->dataSelezionata)
-            ->whereHas('tecnici', fn ($q) => $q->where('users.id', auth()->id()))
-            ->get();
+        $user = Auth::user();
+        $this->interventi = $user
+            ? $user->interventi()
+                ->with('cliente', 'sede')
+                ->whereDate('data_intervento', $this->dataSelezionata)
+                ->orderByRaw('intervento_tecnico.scheduled_start_at IS NULL')
+                ->orderBy('intervento_tecnico.scheduled_start_at')
+                ->orderBy('interventi.id')
+                ->get()
+            : collect();
 
         foreach ($this->interventi as $int) {
             if (!array_key_exists($int->id, $this->noteByIntervento)) {

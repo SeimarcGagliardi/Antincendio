@@ -171,16 +171,11 @@
                                 </label>
 
                                 @if(in_array($tec->id, $tecnici, true))
-                                    <div class="mt-2 grid grid-cols-2 gap-2">
+                                    <div class="mt-2">
                                         <div>
-                                            <label class="block text-xs text-gray-600">Inizio</label>
+                                            <label class="block text-xs text-gray-600">Orario appuntamento</label>
                                             <input type="time" wire:model.defer="tecniciOrari.{{ $tec->id }}.inizio" class="input input-bordered input-sm w-full">
                                             @error("tecniciOrari.$tec->id.inizio") <span class="text-xs text-red-600">{{ $message }}</span> @enderror
-                                        </div>
-                                        <div>
-                                            <label class="block text-xs text-gray-600">Fine</label>
-                                            <input type="time" wire:model.defer="tecniciOrari.{{ $tec->id }}.fine" class="input input-bordered input-sm w-full">
-                                            @error("tecniciOrari.$tec->id.fine") <span class="text-xs text-red-600">{{ $message }}</span> @enderror
                                         </div>
                                     </div>
                                 @endif

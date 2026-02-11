@@ -125,7 +125,6 @@ class FormPianificazioneIntervento extends Component
             if (!isset($this->tecniciOrari[$id])) {
                 $this->tecniciOrari[$id] = [
                     'inizio' => null,
-                    'fine' => null,
                 ];
             }
         }
@@ -199,7 +198,6 @@ class FormPianificazioneIntervento extends Component
 
         foreach ($this->tecnici as $tecId) {
             $rules["tecniciOrari.$tecId.inizio"] = 'required|date_format:H:i';
-            $rules["tecniciOrari.$tecId.fine"] = 'nullable|date_format:H:i|after:tecniciOrari.' . $tecId . '.inizio';
         }
 
         $this->validate($rules);
@@ -207,8 +205,8 @@ class FormPianificazioneIntervento extends Component
         $cliente = Cliente::findOrFail($this->clienteId);
         $sede = $this->sedeId ? Sede::find($this->sedeId) : null;
 
-        $minuti = $sede?->minuti_intervento ?? $cliente->minuti_intervento;
-        $durata = ceil($minuti / count($this->tecnici));
+        $meseIntervento = (int) Carbon::parse($this->dataIntervento)->month;
+        $durata = $this->resolveMinutiPianificazione($cliente, $sede, $meseIntervento);
 
         $intervento = Intervento::create([
             'cliente_id' => $cliente->id,
@@ -223,12 +221,9 @@ class FormPianificazioneIntervento extends Component
         $attachData = [];
         foreach ($this->tecnici as $tecId) {
             $inizio = $this->tecniciOrari[$tecId]['inizio'] ?? null;
-            $fine = $this->tecniciOrari[$tecId]['fine'] ?? null;
 
             $startAt = $inizio ? Carbon::parse($this->dataIntervento . ' ' . $inizio) : null;
-            $endAt = $fine
-                ? Carbon::parse($this->dataIntervento . ' ' . $fine)
-                : ($startAt ? $startAt->copy()->addMinutes($durata) : null);
+            $endAt = $startAt ? $startAt->copy()->addMinutes($durata) : null;
 
             $attachData[$tecId] = [
                 'scheduled_start_at' => $startAt,
@@ -253,6 +248,21 @@ class FormPianificazioneIntervento extends Component
         $this->dispatch('intervento-pianificato');
         $this->dispatch('toast', type: 'success', message: 'Intervento pianificato con successo!');
         $this->applicaFiltri();
+    }
+
+    private function resolveMinutiPianificazione(Cliente $cliente, ?Sede $sede, int $mese): int
+    {
+        $minutiSede = $sede?->minutiPerMese($mese);
+        if (!empty($minutiSede) && (int) $minutiSede > 0) {
+            return (int) $minutiSede;
+        }
+
+        $minutiCliente = $cliente->minutiPerMese($mese);
+        if (!empty($minutiCliente) && (int) $minutiCliente > 0) {
+            return (int) $minutiCliente;
+        }
+
+        return (int) ($sede?->minuti_intervento ?? $cliente->minuti_intervento ?? 60);
     }
 
     public function presidiEvasi($presidi)

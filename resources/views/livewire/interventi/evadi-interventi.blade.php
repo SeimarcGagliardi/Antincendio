@@ -24,6 +24,7 @@
                     <tr>
                         <th>Cliente</th>
                         <th>Sede</th>
+                        <th>Orario</th>
                         <th>Data</th>
                         <th>Stato</th>
                         <th>Note</th>
@@ -47,6 +48,15 @@
                                 </div>
                             </td>
                             <td>{{ $intervento->sede->nome ?? 'Sede principale' }}</td>
+                            <td class="text-xs">
+                                <span class="font-medium">
+                                    {{ optional($intervento->pivot?->scheduled_start_at)->format('H:i') ?? '—' }}
+                                </span>
+                                -
+                                <span class="font-medium">
+                                    {{ optional($intervento->pivot?->scheduled_end_at)->format('H:i') ?? '—' }}
+                                </span>
+                            </td>
                             <td>{{ \Carbon\Carbon::parse($intervento->data_intervento)->format('d/m/Y') }}</td>
                             <td>{{ $intervento->stato }}</td>
                             <td class="min-w-[220px]">
@@ -75,6 +85,8 @@
                                     </a>
                                 </h3>
                                 <p class="text-sm text-gray-600">
+                                    {{ optional($intervento->pivot?->scheduled_start_at)->format('H:i') ?? '—' }} -
+                                    {{ optional($intervento->pivot?->scheduled_end_at)->format('H:i') ?? '—' }} —
                                     {{ $intervento->sede->nome ?? 'Sede principale' }} —
                                     {{ \Carbon\Carbon::parse($intervento->data_intervento)->format('d/m/Y') }} —
                                     Stato: <strong>{{ $intervento->stato }}</strong>

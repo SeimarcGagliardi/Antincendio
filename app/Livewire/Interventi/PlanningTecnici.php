@@ -20,7 +20,10 @@ class PlanningTecnici extends Component
     {
         $tecnici = User::role('Tecnico')
             ->with(['interventi' => function ($q) {
-                $q->where('data_intervento', $this->dataSelezionata);
+                $q->where('data_intervento', $this->dataSelezionata)
+                    ->orderByRaw('intervento_tecnico.scheduled_start_at IS NULL')
+                    ->orderBy('intervento_tecnico.scheduled_start_at')
+                    ->orderBy('interventi.id');
             }, 'interventi.cliente', 'interventi.sede'])
             ->get()
             ->map(function($tec){
