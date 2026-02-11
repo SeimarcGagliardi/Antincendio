@@ -1109,7 +1109,7 @@
             <button wire:click="salva" class="w-full sm:w-auto px-4 py-3 bg-green-600 text-white rounded hover:bg-green-700 text-sm font-semibold">
                 💾 Salva e completa intervento
             </button>
-            <a href="{{ route('rapportino.pdf', $intervento->id) }}" target="_blank"
+            <a href="{{ route('rapportino.pdf', ['id' => $intervento->id, 'kind' => 'cliente']) }}" target="_blank"
                class="w-full sm:w-auto inline-flex items-center justify-center px-4 py-3 rounded border border-green-600 text-green-700 hover:bg-green-50 text-sm font-medium">
                 <i class="fa fa-file-pdf mr-1"></i> Scarica Rapportino PDF
             </a>
@@ -1128,14 +1128,20 @@ document.addEventListener('livewire:init', () => {
         window.__evadiInterventoCompletatoHooked = true;
         Livewire.on('intervento-completato', (payload) => {
             const pdfUrl = payload?.pdfUrl ?? null;
+            const clienteMailtoUrl = payload?.clienteMailtoUrl ?? null;
             const redirectUrl = payload?.redirectUrl ?? null;
             if (pdfUrl) {
                 window.open(pdfUrl, '_blank');
             }
+            if (clienteMailtoUrl) {
+                setTimeout(() => {
+                    window.location.href = clienteMailtoUrl;
+                }, 250);
+            }
             if (redirectUrl) {
                 setTimeout(() => {
                     window.location.href = redirectUrl;
-                }, 500);
+                }, 1200);
             }
         });
     }

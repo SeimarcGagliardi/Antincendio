@@ -11,6 +11,7 @@ use App\Models\Anomalia;
 use App\Models\TipoEstintore;
 use App\Models\InterventoTecnico;
 use App\Models\InterventoTecnicoSessione;
+use App\Models\MailQueueItem;
 use App\Models\TipoPresidio;
 use App\Services\Interventi\OrdinePreventivoService;
 use Carbon\Carbon;
@@ -905,10 +906,16 @@ public function salvaNuovoPresidio()
                 'stato' => 'Completato',
                 'durata_effettiva' => $durataEffettiva,
             ]);
+            $this->accodaMailRapportinoInterno();
             $this->messaggioSuccesso ='Intervento evaso correttamente. Apertura rapportino in corso...';
+
+            $clientePdfUrl = route('rapportino.pdf', ['id' => $this->intervento->id, 'kind' => 'cliente']);
+            $clienteMailtoUrl = $this->buildClienteMailtoUrl($clientePdfUrl);
+
             $this->dispatch(
                 'intervento-completato',
-                pdfUrl: route('rapportino.pdf', $this->intervento->id),
+                pdfUrl: $clientePdfUrl,
+                clienteMailtoUrl: $clienteMailtoUrl,
                 redirectUrl: route('interventi.evadi')
             );
             return;
@@ -1398,6 +1405,66 @@ public function salvaNuovoPresidio()
 
         $pi->anomalie = $selectedIds;
         $pi->save();
+    }
+
+    private function accodaMailRapportinoInterno(): void
+    {
+        $destinatario = trim((string) config('interventi.internal_report_email', 'debora@antincendiolughese.com'));
+        if ($destinatario === '') {
+            return;
+        }
+
+        $interventoId = (int) $this->intervento->id;
+
+        $esiste = MailQueueItem::query()
+            ->where('intervento_id', $interventoId)
+            ->where('tipo', 'rapportino_interno')
+            ->whereIn('status', ['queued', 'processing', 'sent'])
+            ->exists();
+
+        if ($esiste) {
+            return;
+        }
+
+        $delay = max(0, (int) config('interventi.internal_report_delay_minutes', 10));
+
+        MailQueueItem::create([
+            'intervento_id' => $interventoId,
+            'tipo' => 'rapportino_interno',
+            'to_email' => $destinatario,
+            'subject' => sprintf(
+                'Rapportino interno intervento #%d - %s',
+                $interventoId,
+                (string) ($this->intervento->cliente?->nome ?? 'Cliente')
+            ),
+            'body' => 'In allegato il rapportino interno intervento completo di riepiloghi.',
+            'payload' => [
+                'pdf_kind' => 'interno',
+            ],
+            'send_after' => now()->addMinutes($delay),
+            'status' => 'queued',
+            'attempts' => 0,
+        ]);
+    }
+
+    private function buildClienteMailtoUrl(string $clientePdfUrl): ?string
+    {
+        $emailCliente = trim((string) ($this->intervento->cliente?->email ?? ''));
+        if ($emailCliente === '') {
+            return null;
+        }
+
+        $data = $this->intervento->data_intervento
+            ? Carbon::parse($this->intervento->data_intervento)->format('d/m/Y')
+            : date('d/m/Y');
+
+        $subject = 'Rapportino intervento ' . ($this->intervento->cliente?->nome ?? '');
+        $body = "Buongiorno,\n\ninviamo il rapportino dell'intervento del {$data}.\n";
+        $body .= "Link PDF: {$clientePdfUrl}\n\nCordiali saluti.";
+
+        return 'mailto:' . $emailCliente
+            . '?subject=' . rawurlencode($subject)
+            . '&body=' . rawurlencode($body);
     }
 
 

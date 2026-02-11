@@ -11,3 +11,7 @@ Artisan::command('inspire', function () {
 Schedule::command('sincronizza:clienti --lookback=1')
     ->cron('*/2 * * * *')
     ->withoutOverlapping();
+
+Schedule::command('mail-queue:process --limit=25')
+    ->everyMinute()
+    ->withoutOverlapping();
