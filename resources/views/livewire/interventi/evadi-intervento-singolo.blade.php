@@ -1266,7 +1266,16 @@ function pulisciFirma() {
 
 function salvaFirma() {
     let base64 = canvas.toDataURL("image/png");
-    Livewire.dispatch('firmaClienteAcquisita', { data: { base64: base64 } });
+    const root = document.getElementById('evadi-intervento-root');
+    const componentId = root?.getAttribute('wire:id');
+    const component = componentId && window.Livewire ? window.Livewire.find(componentId) : null;
+
+    if (component) {
+        component.call('salvaFirmaCliente', base64);
+        return;
+    }
+
+    Livewire.dispatch('firmaClienteAcquisita', { base64: base64 });
 }
 
 function initOfflineSync() {

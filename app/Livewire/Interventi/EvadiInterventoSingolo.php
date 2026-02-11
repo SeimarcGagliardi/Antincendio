@@ -61,13 +61,26 @@ class EvadiInterventoSingolo extends Component
     ];
 
     #[On('firmaClienteAcquisita')]
-    public function salvaFirmaCliente($data)
+    public function salvaFirmaCliente($payload = null): void
     {
+        $base64 = null;
+        if (is_string($payload)) {
+            $base64 = $payload;
+        } elseif (is_array($payload)) {
+            $base64 = $payload['base64'] ?? ($payload['data']['base64'] ?? null);
+        }
+
+        $base64 = is_string($base64) ? trim($base64) : null;
+        if (!$base64 || !str_starts_with($base64, 'data:image/')) {
+            $this->messaggioErrore = 'Firma non valida. Riprova.';
+            return;
+        }
+
         $this->intervento->update([
-            'firma_cliente_base64' => $data['base64']
+            'firma_cliente_base64' => $base64
         ]);
 
-        $this->messaggioSuccesso = "Firma salvata con successo.";
+        $this->messaggioSuccesso = 'Firma salvata con successo.';
     }
 
     private function interventoRelations(): array
