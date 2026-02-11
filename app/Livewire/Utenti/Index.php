@@ -20,8 +20,10 @@ class Index extends Component
     public function render()
     {
         $utenti = User::with('ruoli')
-            ->where('name', 'like', '%' . $this->search . '%')
-            ->orWhere('email', 'like', '%' . $this->search . '%')
+            ->where(function ($query) {
+                $query->where('name', 'like', '%' . $this->search . '%')
+                    ->orWhere('email', 'like', '%' . $this->search . '%');
+            })
             ->orderBy('name')
             ->paginate(10);
 
