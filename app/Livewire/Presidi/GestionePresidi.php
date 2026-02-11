@@ -116,6 +116,50 @@ class GestionePresidi extends Component
         $this->scadenzaPresidio = \Carbon\Carbon::parse($this->dataAcquisto)
             ->addYears($anni)->startOfMonth()->format('Y-m-d');
     }
+
+    public function updatedMarcaSerbatoio($value): void
+    {
+        $this->marcaSerbatoio = $this->normalizeMarca($value);
+    }
+
+    public function updatedPresidiData($value, $name): void
+    {
+        if (!preg_match('/^(\d+)\.marca_serbatoio$/', (string) $name, $m)) {
+            return;
+        }
+
+        $id = (int) ($m[1] ?? 0);
+        if ($id <= 0 || !isset($this->presidiData[$id])) {
+            return;
+        }
+
+        $this->presidiData[$id]['marca_serbatoio'] = $this->normalizeMarca($value);
+        $this->ricalcolaDate($id);
+    }
+
+    public function toggleMarcaMbNuovo(): void
+    {
+        $isMb = $this->normalizeMarca($this->marcaSerbatoio) === 'MB';
+        $this->marcaSerbatoio = $isMb ? null : 'MB';
+    }
+
+    public function toggleMarcaMbRiga(int $id): void
+    {
+        if (!isset($this->presidiData[$id])) {
+            return;
+        }
+
+        $isMb = $this->normalizeMarca($this->presidiData[$id]['marca_serbatoio'] ?? null) === 'MB';
+        $this->presidiData[$id]['marca_serbatoio'] = $isMb ? null : 'MB';
+        $this->ricalcolaDate($id);
+    }
+
+    private function normalizeMarca($marca): ?string
+    {
+        $marca = mb_strtoupper(trim((string) $marca));
+        return $marca === '' ? null : $marca;
+    }
+
 public function abilitaModifica($id)
 {
     $this->presidioInModifica = $id;
@@ -133,6 +177,7 @@ public function abilitaModifica($id)
       
     $row['idrante_tipo_id'] = $p->idrante_tipo_id;
     $row['porta_tipo_id'] = $p->porta_tipo_id;
+    $row['marca_serbatoio'] = $this->normalizeMarca($row['marca_serbatoio'] ?? null);
     $this->presidiData[$id] = $row;
 }
 public function disattiva($id)
@@ -148,6 +193,9 @@ public function disattiva($id)
 public function salvaRiga($id)
 {
     $presidio = Presidio::find($id);
+    if (isset($this->presidiData[$id]['marca_serbatoio'])) {
+        $this->presidiData[$id]['marca_serbatoio'] = $this->normalizeMarca($this->presidiData[$id]['marca_serbatoio']);
+    }
     $presidio->fill($this->presidiData[$id]);
 
     if (isset($this->presidiData[$id]['data_serbatoio'])) {
@@ -191,6 +239,7 @@ public function ricalcolaDate(int $id): void
     $tipoId   = $row['tipo_estintore_id'] ?? null;
     $serb     = $row['data_serbatoio']    ?? null;
     $acq      = $row['data_acquisto']     ?? null;
+    $row['marca_serbatoio'] = $this->normalizeMarca($row['marca_serbatoio'] ?? null);
 
     // se c’è acquisto e non c’è scadenza_presidio, calcolala qui (regola tua di business)
     if ($acq && empty($row['scadenza_presidio'])) {
@@ -313,7 +362,7 @@ public function ricalcolaDate(int $id): void
             'flag_anomalia3' => $this->anomalia3,
             'note' => $this->note,
             'data_serbatoio' => $categoria === 'Estintore' ? $this->dataSerbatoio : null,
-            'marca_serbatoio' => $categoria === 'Estintore' ? $this->marcaSerbatoio : null,
+            'marca_serbatoio' => $categoria === 'Estintore' ? $this->normalizeMarca($this->marcaSerbatoio) : null,
             'data_ultima_revisione' => $categoria === 'Estintore' ? $this->dataUltimaRevisione : null,
             'flag_preventivo' => $this->flagPreventivo,
             'descrizione' => $this->descrizione,

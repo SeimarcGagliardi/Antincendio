@@ -268,14 +268,16 @@
                                 {{-- Marca Serbatoio --}}
                                 <td class="px-2 py-1">
                                     @if($presidio->id === $presidioInModifica)
+                                        @php
+                                            $marcaEdit = strtoupper(trim((string)($presidiData[$presidio->id]['marca_serbatoio'] ?? ''))) === 'MB';
+                                        @endphp
                                         <div class="flex items-center gap-2">
                                             <input type="text"
-                                                wire:model.defer="presidiData.{{ $presidio->id }}.marca_serbatoio"
-                                                wire:change="ricalcolaDate({{ $presidio->id }})"
+                                                wire:model.live="presidiData.{{ $presidio->id }}.marca_serbatoio"
                                                 class="form-input w-full rounded-md border-gray-300 text-sm" />
                                             <button type="button"
-                                                wire:click="$set('presidiData.{{ $presidio->id }}.marca_serbatoio','MB')"
-                                                class="px-2 py-1 text-xs rounded bg-gray-200 hover:bg-gray-300">
+                                                wire:click="toggleMarcaMbRiga({{ $presidio->id }})"
+                                                class="px-2 py-1 text-xs rounded border {{ $marcaEdit ? 'bg-red-600 text-white border-red-700' : 'bg-gray-200 text-gray-800 border-gray-300 hover:bg-gray-300' }}">
                                                 MB
                                             </button>
                                         </div>
@@ -539,12 +541,13 @@
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Marca Serbatoio</label>
+                    @php $marcaNuovoMb = strtoupper(trim((string)($marcaSerbatoio ?? ''))) === 'MB'; @endphp
                     <div class="mt-1 flex items-center gap-2">
-                        <input type="text" wire:model="marcaSerbatoio"
+                        <input type="text" wire:model.live="marcaSerbatoio"
                             class="w-full rounded border-gray-300 shadow-sm">
                         <button type="button"
-                            wire:click="$set('marcaSerbatoio','MB')"
-                            class="px-3 py-2 text-xs rounded bg-gray-200 hover:bg-gray-300">
+                            wire:click="toggleMarcaMbNuovo"
+                            class="px-3 py-2 text-xs rounded border {{ $marcaNuovoMb ? 'bg-red-600 text-white border-red-700' : 'bg-gray-200 text-gray-800 border-gray-300 hover:bg-gray-300' }}">
                             MB
                         </button>
                     </div>
