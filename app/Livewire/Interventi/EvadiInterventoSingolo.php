@@ -89,7 +89,6 @@ public function apriFormNuovoPresidio()
         'tipo_estintore_id' => null,
         'data_serbatoio' => null,
         'marca_serbatoio' => null,
-        'marca_mb' => false,
         'data_ultima_revisione' => null,
         'categoria' => 'Estintore',
         'idrante_tipo_id' => null,
@@ -112,7 +111,6 @@ public function updatedNuovoPresidioCategoria($categoria): void
         $this->nuovoPresidio['data_serbatoio'] = null;
         $this->nuovoPresidio['data_ultima_revisione'] = null;
         $this->nuovoPresidio['marca_serbatoio'] = null;
-        $this->nuovoPresidio['marca_mb'] = false;
         $this->nuovoPresidio['usa_ritiro'] = false;
     }
     if ($categoria !== 'Idrante') {
@@ -132,20 +130,9 @@ public function updatedNuovoPresidioCategoria($categoria): void
     }
 }
 
-public function updatedNuovoPresidioMarcaMb($checked): void
-{
-    $enabled = filter_var($checked, FILTER_VALIDATE_BOOL);
-    if ($enabled) {
-        $this->nuovoPresidio['marca_serbatoio'] = 'MB';
-    } elseif ($this->normalizeMarca($this->nuovoPresidio['marca_serbatoio'] ?? null) === 'MB') {
-        $this->nuovoPresidio['marca_serbatoio'] = null;
-    }
-    $this->aggiornaPreviewNuovo();
-}
-
 public function updatedNuovoPresidioMarcaSerbatoio($value): void
 {
-    $this->nuovoPresidio['marca_mb'] = $this->normalizeMarca($value) === 'MB';
+    $this->nuovoPresidio['marca_serbatoio'] = $this->normalizeMarca((string) $value);
     $this->aggiornaPreviewNuovo();
 }
 
@@ -170,8 +157,7 @@ public function salvaNuovoPresidio()
 
     $tipoEstintoreId = $categoria === 'Estintore' ? $this->nuovoPresidio['tipo_estintore_id'] : null;
     $dataSerbatoio = $categoria === 'Estintore' ? $this->nuovoPresidio['data_serbatoio'] : null;
-    $marcaInput = ($this->nuovoPresidio['marca_mb'] ?? false) ? 'MB' : ($this->nuovoPresidio['marca_serbatoio'] ?? null);
-    $marcaSerbatoio = $categoria === 'Estintore' ? $this->normalizeMarca($marcaInput) : null;
+    $marcaSerbatoio = $categoria === 'Estintore' ? $this->normalizeMarca($this->nuovoPresidio['marca_serbatoio'] ?? null) : null;
     $dataUltimaRev = $categoria === 'Estintore' ? ($this->nuovoPresidio['data_ultima_revisione'] ?? null) : null;
 
     $idranteTipoId = $categoria === 'Idrante' ? ($this->nuovoPresidio['idrante_tipo_id'] ?? null) : null;
@@ -221,7 +207,6 @@ public function salvaNuovoPresidio()
             'nuovo_tipo_estintore_id' => null,
             'nuova_data_serbatoio' => null,
             'nuova_marca_serbatoio' => $presidio->marca_serbatoio,
-            'nuova_marca_mb' => $this->normalizeMarca($presidio->marca_serbatoio) === 'MB',
             'nuova_data_ultima_revisione' => $presidio->data_ultima_revisione,
             'nuovo_idrante_tipo_id' => $presidio->idrante_tipo_id,
             'nuovo_idrante_lunghezza' => $presidio->idrante_lunghezza,
@@ -249,7 +234,7 @@ public function salvaNuovoPresidio()
             'tecnici',
             ...$this->interventoRelations()
         );
-        $this->durataEffettiva = $this->intervento->durata_effettiva;
+        $this->durataEffettiva = (int) ($this->intervento->durata_effettiva ?? 0);
         $this->showControlloAnnualeIdranti = $this->isMeseMinutaggioPiuAlto();
         $this->marcaSuggestions = $this->caricaMarcheSuggerite();
         $this->tipiIdranti = TipoPresidio::whereRaw('LOWER(categoria) = ?', ['idrante'])
@@ -301,7 +286,6 @@ public function salvaNuovoPresidio()
                 'nuovo_tipo_estintore_id' => null,
                 'nuova_data_serbatoio' => null,
                 'nuova_marca_serbatoio' => $presidio->marca_serbatoio,
-                'nuova_marca_mb' => $this->normalizeMarca($presidio->marca_serbatoio) === 'MB',
                 'nuova_data_ultima_revisione' => $presidio->data_ultima_revisione,
                 'nuovo_idrante_tipo_id' => $presidio->idrante_tipo_id,
                 'nuovo_idrante_lunghezza' => $presidio->idrante_lunghezza,
@@ -516,6 +500,7 @@ public function salvaNuovoPresidio()
                 $this->timerAttivo = $end === null;
                 $this->timerTotaleMinuti = (int) $min;
             }
+            $this->durataEffettiva = $this->calcolaDurataEffettivaTotaleIntervento();
             return;
         }
 
@@ -546,6 +531,73 @@ public function salvaNuovoPresidio()
                 $this->timerAttivo = true;
             }
         }
+
+        $this->durataEffettiva = $this->calcolaDurataEffettivaTotaleIntervento();
+    }
+
+    private function calcolaDurataEffettivaTotaleIntervento(): int
+    {
+        $rows = InterventoTecnico::where('intervento_id', $this->intervento->id)
+            ->get(['id', 'started_at', 'ended_at']);
+
+        if ($rows->isEmpty()) {
+            return (int) ($this->durataEffettiva ?? 0);
+        }
+
+        $totaleMinuti = 0;
+        $hasTimerData = false;
+
+        foreach ($rows as $row) {
+            if ($this->timerSessioniEnabled) {
+                $sessioni = InterventoTecnicoSessione::where('intervento_tecnico_id', $row->id)
+                    ->orderBy('started_at')
+                    ->get(['started_at', 'ended_at']);
+
+                if ($sessioni->isNotEmpty()) {
+                    $hasTimerData = true;
+                }
+
+                foreach ($sessioni as $sessione) {
+                    if (!$sessione->started_at) {
+                        continue;
+                    }
+                    $start = Carbon::parse($sessione->started_at);
+                    $end = $sessione->ended_at ? Carbon::parse($sessione->ended_at) : now();
+                    if ($end->lt($start)) {
+                        continue;
+                    }
+                    $totaleMinuti += $start->diffInMinutes($end);
+                }
+
+                if ($sessioni->isEmpty() && $row->started_at) {
+                    $hasTimerData = true;
+                    $start = Carbon::parse($row->started_at);
+                    $end = $row->ended_at ? Carbon::parse($row->ended_at) : now();
+                    if ($end->gte($start)) {
+                        $totaleMinuti += $start->diffInMinutes($end);
+                    }
+                }
+                continue;
+            }
+
+            if (!$row->started_at) {
+                continue;
+            }
+
+            $hasTimerData = true;
+            $start = Carbon::parse($row->started_at);
+            $end = $row->ended_at ? Carbon::parse($row->ended_at) : now();
+            if ($end->lt($start)) {
+                continue;
+            }
+            $totaleMinuti += $start->diffInMinutes($end);
+        }
+
+        if (!$hasTimerData) {
+            return (int) ($this->durataEffettiva ?? 0);
+        }
+
+        return (int) $totaleMinuti;
     }
 
     public function toggleEditPresidio(int $piId): void
@@ -743,19 +795,8 @@ public function salvaNuovoPresidio()
             return;
         }
 
-        if ($field === 'nuova_marca_mb') {
-            $enabled = filter_var($value, FILTER_VALIDATE_BOOL);
-            if ($enabled) {
-                $this->input[$piId]['nuova_marca_serbatoio'] = 'MB';
-            } elseif ($this->normalizeMarca($this->input[$piId]['nuova_marca_serbatoio'] ?? null) === 'MB') {
-                $this->input[$piId]['nuova_marca_serbatoio'] = null;
-            }
-            $this->aggiornaPreviewSostituzione($piId);
-            return;
-        }
-
         if ($field === 'nuova_marca_serbatoio') {
-            $this->input[$piId]['nuova_marca_mb'] = $this->normalizeMarca($value) === 'MB';
+            $this->input[$piId]['nuova_marca_serbatoio'] = $this->normalizeMarca((string) $value);
             $this->aggiornaPreviewSostituzione($piId);
             return;
         }
@@ -838,8 +879,6 @@ public function salvaNuovoPresidio()
                 $this->salvaPresidio($pi->id);
             }
 
-            // Se tutti i presidi sono verificati, completa l'intervento
-            $this->intervento->update(['stato' => 'Completato','durata_effettiva' => $this->durataEffettiva,]);
             if ($this->timerSessioniEnabled) {
                 $tecniciRows = InterventoTecnico::where('intervento_id', $this->intervento->id)->get(['id', 'started_at', 'ended_at']);
                 $ids = $tecniciRows->pluck('id')->all();
@@ -858,6 +897,14 @@ public function salvaNuovoPresidio()
                     ->whereNull('ended_at')
                     ->update(['ended_at' => now()]);
             }
+
+            // Se tutti i presidi sono verificati, completa l'intervento con durata calcolata dai timer
+            $durataEffettiva = $this->calcolaDurataEffettivaTotaleIntervento();
+            $this->durataEffettiva = $durataEffettiva;
+            $this->intervento->update([
+                'stato' => 'Completato',
+                'durata_effettiva' => $durataEffettiva,
+            ]);
             $this->messaggioSuccesso ='Intervento evaso correttamente. Apertura rapportino in corso...';
             $this->dispatch(
                 'intervento-completato',
@@ -921,7 +968,7 @@ public function salvaNuovoPresidio()
             $giacenza->decrement('quantita');
         }
 
-        $nuovaMarca = ($dati['nuova_marca_mb'] ?? false) ? 'MB' : ($dati['nuova_marca_serbatoio'] ?? $vecchio->marca_serbatoio);
+        $nuovaMarca = $this->normalizeMarca($dati['nuova_marca_serbatoio'] ?? null) ?? $vecchio->marca_serbatoio;
 
         $nuovo = new Presidio([
             'cliente_id' => $vecchio->cliente_id,
@@ -1010,7 +1057,7 @@ public function salvaNuovoPresidio()
                 $giacenza->decrement('quantita');
             }
 
-            $nuovaMarca = ($dati['nuova_marca_mb'] ?? false) ? 'MB' : ($dati['nuova_marca_serbatoio'] ?? $vecchio->marca_serbatoio);
+            $nuovaMarca = $this->normalizeMarca($dati['nuova_marca_serbatoio'] ?? null) ?? $vecchio->marca_serbatoio;
 
             $nuovo = new Presidio([
                 'cliente_id' => $vecchio->cliente_id,
@@ -1062,22 +1109,22 @@ public function salvaNuovoPresidio()
         if (!isset($this->input[$id])) {
             return;
         }
-        $this->input[$id]['nuova_marca_serbatoio'] = 'MB';
-        $this->input[$id]['nuova_marca_mb'] = true;
+        $isMb = $this->normalizeMarca($this->input[$id]['nuova_marca_serbatoio'] ?? null) === 'MB';
+        $this->input[$id]['nuova_marca_serbatoio'] = $isMb ? null : 'MB';
         $this->aggiornaPreviewSostituzione($id);
     }
 
     public function setMarcaMbNuovo(): void
     {
-        $this->nuovoPresidio['marca_serbatoio'] = 'MB';
-        $this->nuovoPresidio['marca_mb'] = true;
+        $isMb = $this->normalizeMarca($this->nuovoPresidio['marca_serbatoio'] ?? null) === 'MB';
+        $this->nuovoPresidio['marca_serbatoio'] = $isMb ? null : 'MB';
         $this->aggiornaPreviewNuovo();
     }
 
     public function aggiornaPreviewSostituzione(int $id): void
     {
         $dati = $this->input[$id] ?? [];
-        $marca = ($dati['nuova_marca_mb'] ?? false) ? 'MB' : ($dati['nuova_marca_serbatoio'] ?? null);
+        $marca = $dati['nuova_marca_serbatoio'] ?? null;
         $this->previewSostituzione[$id] = $this->calcolaPreviewScadenze(
             $dati['nuovo_tipo_estintore_id'] ?? null,
             $dati['nuova_data_serbatoio'] ?? null,
@@ -1089,7 +1136,7 @@ public function salvaNuovoPresidio()
     public function aggiornaPreviewNuovo(): void
     {
         $dati = $this->nuovoPresidio ?? [];
-        $marca = ($dati['marca_mb'] ?? false) ? 'MB' : ($dati['marca_serbatoio'] ?? null);
+        $marca = $dati['marca_serbatoio'] ?? null;
         $this->previewNuovo = $this->calcolaPreviewScadenze(
             $dati['tipo_estintore_id'] ?? null,
             $dati['data_serbatoio'] ?? null,

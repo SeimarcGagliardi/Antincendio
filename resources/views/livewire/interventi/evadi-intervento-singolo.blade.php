@@ -151,14 +151,15 @@
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Marca Serbatoio</label>
+                    @php $nuovoMarcaMb = strtoupper(trim((string)($nuovoPresidio['marca_serbatoio'] ?? ''))) === 'MB'; @endphp
                     <div class="flex items-center gap-2">
                         <input type="text" list="marca-serbatoio-opzioni" wire:model="nuovoPresidio.marca_serbatoio" wire:change="aggiornaPreviewNuovo" class="w-full border-gray-300 rounded px-2 py-1" placeholder="MB / altro">
-                        <button type="button" wire:click="setMarcaMbNuovo" class="px-2 py-1 text-xs rounded border border-gray-300 hover:bg-gray-50">MB</button>
+                        <button type="button"
+                                wire:click.prevent="setMarcaMbNuovo"
+                                class="px-2 py-1 text-xs rounded border {{ $nuovoMarcaMb ? 'bg-red-600 text-white border-red-700' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50' }}">
+                            MB
+                        </button>
                     </div>
-                    <label class="mt-1 inline-flex items-center gap-2 text-xs text-gray-600">
-                        <input type="checkbox" wire:model="nuovoPresidio.marca_mb" class="border-gray-300">
-                        Flag MB
-                    </label>
                 </div>
 
                 <div>
@@ -359,22 +360,35 @@
                                                     @php $cat = $pi->presidio->categoria ?? 'Estintore'; @endphp
                                                     <div class="mt-2 space-y-1">
                                                         @if($cat === 'Estintore')
-                                                            <select wire:model="input.{{ $pi->id }}.nuovo_tipo_estintore_id" wire:change="aggiornaPreviewSostituzione({{ $pi->id }})" class="w-full border-gray-300 rounded px-2 py-1">
-                                                                <option value="">Tipo Estintore</option>
-                                                                @foreach ($tipiEstintori as $tipo)
-                                                                    <option value="{{ $tipo->id }}">{{ $tipo->sigla }} – {{ $tipo->descrizione }}</option>
-                                                                @endforeach
-                                                            </select>
-                                                            <input type="date" wire:model="input.{{ $pi->id }}.nuova_data_serbatoio" wire:change="aggiornaPreviewSostituzione({{ $pi->id }})" class="w-full border-gray-300 rounded px-2 py-1">
-                                                            <div class="flex items-center gap-2">
-                                                                <input type="text" list="marca-serbatoio-opzioni" wire:model="input.{{ $pi->id }}.nuova_marca_serbatoio" wire:change="aggiornaPreviewSostituzione({{ $pi->id }})" class="w-full border-gray-300 rounded px-2 py-1" placeholder="Marca serbatoio (MB / altro)">
-                                                                <button type="button" wire:click="setMarcaMbSostituzione({{ $pi->id }})" class="px-2 py-1 text-xs rounded border border-gray-300 hover:bg-gray-50">MB</button>
+                                                            @php $sostMarcaMb = strtoupper(trim((string)($input[$pi->id]['nuova_marca_serbatoio'] ?? ''))) === 'MB'; @endphp
+                                                            <div>
+                                                                <label class="block text-xs text-gray-600 mb-1">Tipo estintore sostitutivo</label>
+                                                                <select wire:model="input.{{ $pi->id }}.nuovo_tipo_estintore_id" wire:change="aggiornaPreviewSostituzione({{ $pi->id }})" class="w-full border-gray-300 rounded px-2 py-1">
+                                                                    <option value="">Tipo Estintore</option>
+                                                                    @foreach ($tipiEstintori as $tipo)
+                                                                        <option value="{{ $tipo->id }}">{{ $tipo->sigla }} – {{ $tipo->descrizione }}</option>
+                                                                    @endforeach
+                                                                </select>
                                                             </div>
-                                                            <label class="inline-flex items-center gap-2 text-xs text-gray-600">
-                                                                <input type="checkbox" wire:model="input.{{ $pi->id }}.nuova_marca_mb" class="border-gray-300">
-                                                                Flag MB
-                                                            </label>
-                                                            <input type="date" wire:model="input.{{ $pi->id }}.nuova_data_ultima_revisione" wire:change="aggiornaPreviewSostituzione({{ $pi->id }})" class="w-full border-gray-300 rounded px-2 py-1" placeholder="Ultima revisione">
+                                                            <div>
+                                                                <label class="block text-xs text-gray-600 mb-1">Data serbatoio sostitutivo</label>
+                                                                <input type="date" wire:model="input.{{ $pi->id }}.nuova_data_serbatoio" wire:change="aggiornaPreviewSostituzione({{ $pi->id }})" class="w-full border-gray-300 rounded px-2 py-1">
+                                                            </div>
+                                                            <div>
+                                                                <label class="block text-xs text-gray-600 mb-1">Marca serbatoio sostitutivo</label>
+                                                                <div class="flex items-center gap-2">
+                                                                    <input type="text" list="marca-serbatoio-opzioni" wire:model="input.{{ $pi->id }}.nuova_marca_serbatoio" wire:change="aggiornaPreviewSostituzione({{ $pi->id }})" class="w-full border-gray-300 rounded px-2 py-1" placeholder="Marca serbatoio (MB / altro)">
+                                                                    <button type="button"
+                                                                            wire:click.prevent="setMarcaMbSostituzione({{ $pi->id }})"
+                                                                            class="px-2 py-1 text-xs rounded border {{ $sostMarcaMb ? 'bg-red-600 text-white border-red-700' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50' }}">
+                                                                        MB
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                            <div>
+                                                                <label class="block text-xs text-gray-600 mb-1">Data ultima revisione sostitutiva</label>
+                                                                <input type="date" wire:model="input.{{ $pi->id }}.nuova_data_ultima_revisione" wire:change="aggiornaPreviewSostituzione({{ $pi->id }})" class="w-full border-gray-300 rounded px-2 py-1" placeholder="Ultima revisione">
+                                                            </div>
                                                             <label class="flex gap-1 items-center text-sm">
                                                                 <input type="checkbox" wire:model="input.{{ $pi->id }}.usa_ritiro" class="border-gray-300">
                                                                 Presidio usato
@@ -390,19 +404,25 @@
                                                                 </div>
                                                             @endif
                                                         @elseif($cat === 'Idrante')
-                                                            <select wire:model="input.{{ $pi->id }}.nuovo_idrante_tipo_id" class="w-full border-gray-300 rounded px-2 py-1">
-                                                                <option value="">Tipo Idrante</option>
-                                                                @foreach ($tipiIdranti as $id => $tipo)
-                                                                    <option value="{{ $id }}">{{ $tipo }}</option>
-                                                                @endforeach
-                                                            </select>
+                                                            <div>
+                                                                <label class="block text-xs text-gray-600 mb-1">Tipo idrante sostitutivo</label>
+                                                                <select wire:model="input.{{ $pi->id }}.nuovo_idrante_tipo_id" class="w-full border-gray-300 rounded px-2 py-1">
+                                                                    <option value="">Tipo Idrante</option>
+                                                                    @foreach ($tipiIdranti as $id => $tipo)
+                                                                        <option value="{{ $id }}">{{ $tipo }}</option>
+                                                                    @endforeach
+                                                                </select>
+                                                            </div>
                                                         @elseif($cat === 'Porta')
-                                                            <select wire:model="input.{{ $pi->id }}.nuovo_porta_tipo_id" class="w-full border-gray-300 rounded px-2 py-1">
-                                                                <option value="">Tipo Porta</option>
-                                                                @foreach ($tipiPorte as $id => $tipo)
-                                                                    <option value="{{ $id }}">{{ $tipo }}</option>
-                                                                @endforeach
-                                                            </select>
+                                                            <div>
+                                                                <label class="block text-xs text-gray-600 mb-1">Tipo porta sostitutiva</label>
+                                                                <select wire:model="input.{{ $pi->id }}.nuovo_porta_tipo_id" class="w-full border-gray-300 rounded px-2 py-1">
+                                                                    <option value="">Tipo Porta</option>
+                                                                    @foreach ($tipiPorte as $id => $tipo)
+                                                                        <option value="{{ $id }}">{{ $tipo }}</option>
+                                                                    @endforeach
+                                                                </select>
+                                                            </div>
                                                         @endif
                                                         <button wire:click="sostituisciPresidio({{ $pi->id }})" class="bg-blue-600 text-white px-3 py-1 rounded text-sm mt-2">
                                                             Conferma Sostituzione
@@ -696,37 +716,55 @@
                                 @php $cat = $pi->presidio->categoria ?? 'Estintore'; @endphp
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3">
                                     @if($cat === 'Estintore')
-                                        <select wire:model="input.{{ $pi->id }}.nuovo_tipo_estintore_id" wire:change="aggiornaPreviewSostituzione({{ $pi->id }})" class="w-full text-sm border-gray-300 rounded px-2 py-1">
-                                            <option value="">Tipo Estintore</option>
-                                            @foreach ($tipiEstintori as $tipo)
-                                                <option value="{{ $tipo->id }}">{{ $tipo->sigla }} – {{ $tipo->descrizione }}</option>
-                                            @endforeach
-                                        </select>
-
-                                        <input type="date" wire:model="input.{{ $pi->id }}.nuova_data_serbatoio" wire:change="aggiornaPreviewSostituzione({{ $pi->id }})" class="w-full text-sm border-gray-300 rounded px-2 py-1">
-                                        <div class="flex items-center gap-2">
-                                            <input type="text" list="marca-serbatoio-opzioni" wire:model="input.{{ $pi->id }}.nuova_marca_serbatoio" wire:change="aggiornaPreviewSostituzione({{ $pi->id }})" class="w-full text-sm border-gray-300 rounded px-2 py-1" placeholder="Marca serbatoio (MB / altro)">
-                                            <button type="button" wire:click="setMarcaMbSostituzione({{ $pi->id }})" class="px-2 py-1 text-xs rounded border border-gray-300 hover:bg-gray-50">MB</button>
+                                        @php $sostMarcaMb = strtoupper(trim((string)($input[$pi->id]['nuova_marca_serbatoio'] ?? ''))) === 'MB'; @endphp
+                                        <div>
+                                            <label class="text-xs text-gray-600 mb-1 block">Tipo estintore sostitutivo</label>
+                                            <select wire:model="input.{{ $pi->id }}.nuovo_tipo_estintore_id" wire:change="aggiornaPreviewSostituzione({{ $pi->id }})" class="w-full text-sm border-gray-300 rounded px-2 py-1">
+                                                <option value="">Tipo Estintore</option>
+                                                @foreach ($tipiEstintori as $tipo)
+                                                    <option value="{{ $tipo->id }}">{{ $tipo->sigla }} – {{ $tipo->descrizione }}</option>
+                                                @endforeach
+                                            </select>
                                         </div>
-                                        <label class="inline-flex items-center gap-2 text-xs text-gray-600">
-                                            <input type="checkbox" wire:model="input.{{ $pi->id }}.nuova_marca_mb" class="border-gray-300">
-                                            Flag MB
-                                        </label>
-                                        <input type="date" wire:model="input.{{ $pi->id }}.nuova_data_ultima_revisione" wire:change="aggiornaPreviewSostituzione({{ $pi->id }})" class="w-full text-sm border-gray-300 rounded px-2 py-1">
+                                        <div>
+                                            <label class="text-xs text-gray-600 mb-1 block">Data serbatoio sostitutivo</label>
+                                            <input type="date" wire:model="input.{{ $pi->id }}.nuova_data_serbatoio" wire:change="aggiornaPreviewSostituzione({{ $pi->id }})" class="w-full text-sm border-gray-300 rounded px-2 py-1">
+                                        </div>
+                                        <div class="md:col-span-2">
+                                            <label class="text-xs text-gray-600 mb-1 block">Marca serbatoio sostitutivo</label>
+                                            <div class="flex items-center gap-2">
+                                                <input type="text" list="marca-serbatoio-opzioni" wire:model="input.{{ $pi->id }}.nuova_marca_serbatoio" wire:change="aggiornaPreviewSostituzione({{ $pi->id }})" class="w-full text-sm border-gray-300 rounded px-2 py-1" placeholder="Marca serbatoio (MB / altro)">
+                                                <button type="button"
+                                                        wire:click.prevent="setMarcaMbSostituzione({{ $pi->id }})"
+                                                        class="px-2 py-1 text-xs rounded border {{ $sostMarcaMb ? 'bg-red-600 text-white border-red-700' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50' }}">
+                                                    MB
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label class="text-xs text-gray-600 mb-1 block">Data ultima revisione sostitutiva</label>
+                                            <input type="date" wire:model="input.{{ $pi->id }}.nuova_data_ultima_revisione" wire:change="aggiornaPreviewSostituzione({{ $pi->id }})" class="w-full text-sm border-gray-300 rounded px-2 py-1">
+                                        </div>
                                     @elseif($cat === 'Idrante')
-                                        <select wire:model="input.{{ $pi->id }}.nuovo_idrante_tipo_id" class="w-full text-sm border-gray-300 rounded px-2 py-1">
-                                            <option value="">Tipo Idrante</option>
-                                            @foreach ($tipiIdranti as $id => $tipo)
-                                                <option value="{{ $id }}">{{ $tipo }}</option>
-                                            @endforeach
-                                        </select>
+                                        <div>
+                                            <label class="text-xs text-gray-600 mb-1 block">Tipo idrante sostitutivo</label>
+                                            <select wire:model="input.{{ $pi->id }}.nuovo_idrante_tipo_id" class="w-full text-sm border-gray-300 rounded px-2 py-1">
+                                                <option value="">Tipo Idrante</option>
+                                                @foreach ($tipiIdranti as $id => $tipo)
+                                                    <option value="{{ $id }}">{{ $tipo }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
                                     @elseif($cat === 'Porta')
-                                        <select wire:model="input.{{ $pi->id }}.nuovo_porta_tipo_id" class="w-full text-sm border-gray-300 rounded px-2 py-1">
-                                            <option value="">Tipo Porta</option>
-                                            @foreach ($tipiPorte as $id => $tipo)
-                                                <option value="{{ $id }}">{{ $tipo }}</option>
-                                            @endforeach
-                                        </select>
+                                        <div>
+                                            <label class="text-xs text-gray-600 mb-1 block">Tipo porta sostitutiva</label>
+                                            <select wire:model="input.{{ $pi->id }}.nuovo_porta_tipo_id" class="w-full text-sm border-gray-300 rounded px-2 py-1">
+                                                <option value="">Tipo Porta</option>
+                                                @foreach ($tipiPorte as $id => $tipo)
+                                                    <option value="{{ $id }}">{{ $tipo }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
                                     @endif
                                 </div>
                                 @if($cat === 'Estintore')
@@ -1041,7 +1079,15 @@
 
     <div>
         <label class="text-sm font-medium">⏱ Tempo effettivo (minuti)</label>
-        <input type="number" wire:model="durataEffettiva" class="input input-sm input-bordered w-full max-w-xs">
+        <input type="number"
+               wire:model="durataEffettiva"
+               @readonly($timerSessioniEnabled)
+               class="input input-sm input-bordered w-full max-w-xs {{ $timerSessioniEnabled ? 'bg-gray-100 text-gray-700 cursor-not-allowed' : '' }}">
+        @if($timerSessioniEnabled)
+            <div class="text-xs text-gray-500 mt-1">
+                Valore calcolato automaticamente dalla somma delle sessioni timer dei tecnici.
+            </div>
+        @endif
     </div>
     <div class="my-4 p-4 border rounded bg-white">
         <label class="block font-medium mb-2">Firma Cliente:</label>
