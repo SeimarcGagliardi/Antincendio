@@ -273,7 +273,7 @@
                                         @endphp
                                         <div class="flex items-center gap-2">
                                             <input type="text"
-                                                wire:model.live="presidiData.{{ $presidio->id }}.marca_serbatoio"
+                                                wire:model.blur="presidiData.{{ $presidio->id }}.marca_serbatoio"
                                                 class="form-input w-full rounded-md border-gray-300 text-sm" />
                                             <button type="button"
                                                 wire:click="toggleMarcaMbRiga({{ $presidio->id }})"
@@ -543,7 +543,7 @@
                     <label class="block text-sm font-medium text-gray-700">Marca Serbatoio</label>
                     @php $marcaNuovoMb = strtoupper(trim((string)($marcaSerbatoio ?? ''))) === 'MB'; @endphp
                     <div class="mt-1 flex items-center gap-2">
-                        <input type="text" wire:model.live="marcaSerbatoio"
+                        <input type="text" wire:model.blur="marcaSerbatoio"
                             class="w-full rounded border-gray-300 shadow-sm">
                         <button type="button"
                             wire:click="toggleMarcaMbNuovo"

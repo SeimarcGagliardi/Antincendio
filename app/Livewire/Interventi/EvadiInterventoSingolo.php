@@ -1130,7 +1130,7 @@ public function salvaNuovoPresidio()
             $dati['nuova_data_serbatoio'] ?? null,
             $dati['nuova_data_ultima_revisione'] ?? null,
             $marca
-        );
+        ) ?? [];
     }
 
     public function aggiornaPreviewNuovo(): void
@@ -1142,7 +1142,7 @@ public function salvaNuovoPresidio()
             $dati['data_serbatoio'] ?? null,
             $dati['data_ultima_revisione'] ?? null,
             $marca
-        );
+        ) ?? [];
     }
 
     private function calcolaPreviewScadenze($tipoId, $dataSerb, $ultimaRev, $marca): ?array

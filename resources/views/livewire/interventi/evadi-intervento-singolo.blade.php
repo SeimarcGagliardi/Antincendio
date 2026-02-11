@@ -126,15 +126,15 @@
 
             <div>
                 <label class="block text-sm font-medium text-gray-700">Categoria</label>
-                <select wire:model="nuovoPresidio.categoria" class="w-full border-gray-300 rounded px-2 py-1">
+                <select wire:model.live="nuovoPresidio.categoria" class="w-full border-gray-300 rounded px-2 py-1">
                     <option value="Estintore">Estintore</option>
                     <option value="Idrante">Idrante</option>
                     <option value="Porta">Porta</option>
                 </select>
             </div>
 
-            <div>
-                @php $categoriaNuovo = $nuovoPresidio['categoria'] ?? 'Estintore'; @endphp
+            @php $categoriaNuovo = $nuovoPresidio['categoria'] ?? 'Estintore'; @endphp
+            <div wire:key="nuovo-tipo-{{ $categoriaNuovo }}">
                 <label class="block text-sm font-medium text-gray-700">
                     @if($categoriaNuovo === 'Idrante')
                         Tipo Idrante
@@ -179,7 +179,7 @@
                     <label class="block text-sm font-medium text-gray-700">Marca Serbatoio</label>
                     @php $nuovoMarcaMb = strtoupper(trim((string)($nuovoPresidio['marca_serbatoio'] ?? ''))) === 'MB'; @endphp
                     <div class="flex items-center gap-2">
-                        <input type="text" list="marca-serbatoio-opzioni" wire:model.live="nuovoPresidio.marca_serbatoio" class="w-full border-gray-300 rounded px-2 py-1" placeholder="MB / altro">
+                        <input type="text" list="marca-serbatoio-opzioni" wire:model.blur="nuovoPresidio.marca_serbatoio" class="w-full border-gray-300 rounded px-2 py-1" placeholder="MB / altro">
                         <button type="button"
                                 wire:click.prevent="setMarcaMbNuovo"
                                 class="px-2 py-1 text-xs rounded border {{ $nuovoMarcaMb ? 'bg-red-600 text-white border-red-700' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50' }}">
@@ -379,7 +379,7 @@
                                                             <div>
                                                                 <label class="block text-xs text-gray-600 mb-1">Marca serbatoio sostitutivo</label>
                                                                 <div class="flex items-center gap-2">
-                                                                    <input type="text" list="marca-serbatoio-opzioni" wire:model.live="input.{{ $pi->id }}.nuova_marca_serbatoio" class="w-full border-gray-300 rounded px-2 py-1" placeholder="Marca serbatoio (MB / altro)">
+                                                                    <input type="text" list="marca-serbatoio-opzioni" wire:model.blur="input.{{ $pi->id }}.nuova_marca_serbatoio" class="w-full border-gray-300 rounded px-2 py-1" placeholder="Marca serbatoio (MB / altro)">
                                                                     <button type="button"
                                                                             wire:click.prevent="setMarcaMbSostituzione({{ $pi->id }})"
                                                                             class="px-2 py-1 text-xs rounded border {{ $sostMarcaMb ? 'bg-red-600 text-white border-red-700' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50' }}">
@@ -735,7 +735,7 @@
                                         <div class="md:col-span-2">
                                             <label class="text-xs text-gray-600 mb-1 block">Marca serbatoio sostitutivo</label>
                                             <div class="flex items-center gap-2">
-                                                <input type="text" list="marca-serbatoio-opzioni" wire:model.live="input.{{ $pi->id }}.nuova_marca_serbatoio" class="w-full text-sm border-gray-300 rounded px-2 py-1" placeholder="Marca serbatoio (MB / altro)">
+                                                <input type="text" list="marca-serbatoio-opzioni" wire:model.blur="input.{{ $pi->id }}.nuova_marca_serbatoio" class="w-full text-sm border-gray-300 rounded px-2 py-1" placeholder="Marca serbatoio (MB / altro)">
                                                 <button type="button"
                                                         wire:click.prevent="setMarcaMbSostituzione({{ $pi->id }})"
                                                         class="px-2 py-1 text-xs rounded border {{ $sostMarcaMb ? 'bg-red-600 text-white border-red-700' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50' }}">
