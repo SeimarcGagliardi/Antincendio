@@ -412,6 +412,95 @@ public function ricalcola(string $scope, int $index): void
         return mb_strtoupper(trim((string)$marca)) === 'MB';
     }
 
+    private static function extractLength(?string $txt): ?int
+    {
+        $txt = mb_strtoupper(trim((string) $txt));
+        if ($txt === '') return null;
+        if (preg_match('/\b(20|25|30)\b/', $txt, $m)) {
+            return (int) $m[1];
+        }
+        if (preg_match('/\b(\d{2,3})\b/', $txt, $m)) {
+            return (int) $m[1];
+        }
+        return null;
+    }
+
+    public static function normalizeIdranteTipo(?string $idrTipo, ?string $idrLen, bool $sopra = false, bool $sotto = false, ?string $rowText = null): ?string
+    {
+        $row = mb_strtoupper((string) $rowText);
+        if ($row !== '' && str_contains($row, 'ATTACCO VVF')) {
+            return 'Gruppo di mandata attacco VVF';
+        }
+
+        $tipo = mb_strtoupper(trim((string) $idrTipo));
+        $len = self::extractLength($idrLen) ?? self::extractLength($row);
+
+        if ($tipo === 'NASPO' || str_contains($row, 'NASPO')) {
+            return 'Idrante Naspo';
+        }
+
+        if ($tipo === '45' || preg_match('/\\b45\\b/', $row)) {
+            return $len ? "Idrante Manichetta 45 - {$len}mt" : 'Idrante Manichetta 45';
+        }
+
+        if ($tipo === '70' || preg_match('/\\b70\\b/', $row)) {
+            return $len ? "Idrante Manichetta 70 - {$len}mt" : 'Idrante Manichetta 70';
+        }
+
+        if ($sopra || str_contains($row, 'SOPRA SUOLO')) {
+            return 'Idrante Sopra Suolo';
+        }
+
+        if ($sotto || str_contains($row, 'SOTTO SUOLO')) {
+            return 'Idrante Sotto Suolo';
+        }
+
+        $fallback = trim((string) $idrTipo);
+        return $fallback !== '' ? $fallback : null;
+    }
+
+    public static function normalizePortaTipo(?string $raw): ?string
+    {
+        $raw = trim((string) $raw);
+        if ($raw === '') return null;
+
+        $up = mb_strtoupper($raw);
+        $clean = preg_replace('/[^A-Z0-9 ]/u', ' ', $up);
+        $clean = preg_replace('/\\s+/', ' ', trim($clean));
+
+        $anta = null;
+        if (preg_match('/\\b1\\b|\\bUNA\\b/', $clean)) $anta = 1;
+        if (preg_match('/\\b2\\b|\\bDUE\\b/', $clean)) $anta = 2;
+
+        $tipo = null;
+        if (str_contains($clean, 'TGF')) $tipo = 'TGF';
+        elseif (str_contains($clean, 'SCORR')) $tipo = 'SCORREVOLE';
+        elseif (str_contains($clean, 'UE') || str_contains($clean, 'U E')) $tipo = 'UE';
+
+        if ($anta && $tipo) {
+            if ($tipo === 'UE') return $anta === 1 ? '1 Anta U.E' : '2 Ante U.E.';
+            if ($tipo === 'TGF') return $anta === 1 ? '1 Anta TGF' : '2 Ante TGF';
+            if ($tipo === 'SCORREVOLE') return $anta === 1 ? '1 Anta Scorrevole' : '2 Ante Scorrevole';
+        }
+
+        $candidates = [
+            '1 ANTA U E' => '1 Anta U.E',
+            '2 ANTE U E' => '2 Ante U.E.',
+            '1 ANTA TGF' => '1 Anta TGF',
+            '2 ANTE TGF' => '2 Ante TGF',
+            '1 ANTA SCORREVOLE' => '1 Anta Scorrevole',
+            '2 ANTE SCORREVOLE' => '2 Ante Scorrevole',
+        ];
+
+        foreach ($candidates as $needle => $label) {
+            if (str_contains($clean, $needle)) {
+                return $label;
+            }
+        }
+
+        return $raw;
+    }
+
     private function caricaPresidiSalvati(): void
     {
         $this->presidiSalvati = ImportPresidio::where('cliente_id', $this->clienteId)
@@ -593,6 +682,7 @@ public function ricalcola(string $scope, int $index): void
                         $flag1 = !empty($r['anomalia_cartello'] ?? null);
                         $flag2 = !empty($r['anomalia_lancia'] ?? null);
                         $flag3 = !empty($r['anomalia_lastra'] ?? null);
+                        $idrTipo = self::normalizeIdranteTipo($idrTipo, $idrLen, $sopra, $sotto, $joinedUp);
 
                         $this->anteprima[] = [
                             'categoria'         => 'Idrante',
@@ -622,7 +712,7 @@ public function ricalcola(string $scope, int $index): void
 
                     if ($tableType === 'porte') {
                         $note = $r['note'] ?? null;
-                        $portaTipo = $r['porta_tipo'] ?? null;
+                        $portaTipo = self::normalizePortaTipo($r['porta_tipo'] ?? null);
                         $flag1 = !empty($r['anomalia_maniglione'] ?? null);
                         $flag2 = !empty($r['anomalia_molla'] ?? null);
                         $flag3 = !empty($r['anomalia_numerazione'] ?? null);

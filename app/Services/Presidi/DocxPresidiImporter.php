@@ -126,6 +126,7 @@ class DocxPresidiImporter
                         $flag1 = !empty($r['anomalia_cartello'] ?? null);
                         $flag2 = !empty($r['anomalia_lancia'] ?? null);
                         $flag3 = !empty($r['anomalia_lastra'] ?? null);
+                        $idrTipo = ImportaPresidi::normalizeIdranteTipo($idrTipo, $idrLen, $sopra, $sotto, $joinedUp);
 
                         if ($idrTipo) {
                             TipoPresidio::firstOrCreate([
@@ -166,7 +167,7 @@ class DocxPresidiImporter
                             continue;
                         }
                         $note = $r['note'] ?? null;
-                        $portaTipo = $r['porta_tipo'] ?? null;
+                        $portaTipo = ImportaPresidi::normalizePortaTipo($r['porta_tipo'] ?? null);
                         $flag1 = !empty($r['anomalia_maniglione'] ?? null);
                         $flag2 = !empty($r['anomalia_molla'] ?? null);
                         $flag3 = !empty($r['anomalia_numerazione'] ?? null);
