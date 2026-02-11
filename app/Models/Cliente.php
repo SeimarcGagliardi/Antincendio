@@ -21,6 +21,9 @@ class Cliente extends Model
         'cap',
         'provincia',
         'codice_esterno',
+        'forma_pagamento_codice',
+        'forma_pagamento_descrizione',
+        'richiede_pagamento_manutentore',
         'mesi_visita',
         'minuti_intervento',
         'minuti_intervento_mese1',
@@ -32,6 +35,7 @@ class Cliente extends Model
     ];  
     protected $casts = [
         'mesi_visita' => 'array',
+        'richiede_pagamento_manutentore' => 'boolean',
     ];
     
 

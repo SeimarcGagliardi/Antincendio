@@ -22,6 +22,39 @@
         </div>
     </div>
 
+    <div class="bg-white border-2 border-red-200 rounded p-3 shadow-sm text-sm text-gray-800">
+        <div class="font-extrabold tracking-wide">FORMA PAGAMENTO BUSINESS</div>
+        @if($richiedePagamentoManutentore)
+            <div class="mt-1 text-sm font-bold text-red-700">
+                ALLA CONSEGNA (cod. 40): incasso da manutentore obbligatorio
+            </div>
+            <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Metodo incasso</label>
+                    <select wire:model.live="pagamentoMetodo" class="w-full border-gray-300 rounded px-2 py-2 text-sm">
+                        <option value="">Seleziona metodo</option>
+                        <option value="POS">POS</option>
+                        <option value="ASSEGNO">ASSEGNO</option>
+                        <option value="CONTANTI">CONTANTI</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Importo incassato (€)</label>
+                    <input type="number"
+                           step="0.01"
+                           min="0"
+                           wire:model.blur="pagamentoImporto"
+                           placeholder="0,00"
+                           class="w-full border-gray-300 rounded px-2 py-2 text-sm">
+                </div>
+            </div>
+        @else
+            <div class="mt-1 text-sm font-bold text-gray-900">
+                {{ $formaPagamentoDescrizione ?: 'Non disponibile' }}
+            </div>
+        @endif
+    </div>
+
     @php
         $currentTecnico = $intervento->tecnici->firstWhere('id', auth()->id());
         $lastSession = $timerSessioni[0] ?? null;
@@ -1281,6 +1314,14 @@ function initOfflineSync() {
 
             if (model === 'durataEffettiva') {
                 payload.durataEffettiva = getElementValue(el);
+                return;
+            }
+            if (model === 'pagamentoMetodo') {
+                payload.pagamentoMetodo = getElementValue(el);
+                return;
+            }
+            if (model === 'pagamentoImporto') {
+                payload.pagamentoImporto = getElementValue(el);
                 return;
             }
 

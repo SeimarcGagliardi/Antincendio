@@ -12,6 +12,7 @@ class SincronizzaClienti extends Command
 {
     protected $signature = 'sincronizza:clienti {--lookback=1 : Giorni di retrodatazione per sicurezza}';
     protected $description = 'Sincronizza clienti e sedi da MSSQL a MySQL (basata su codice_esterno)';
+    private ?bool $tabpagaJoinAvailable = null;
 
     public function handle()
     {
@@ -20,33 +21,23 @@ class SincronizzaClienti extends Command
         $lookbackDays = (int) $this->option('lookback');
         $lastAnagra = $this->applyLookback($this->getLastSync('anagra'), $lookbackDays);
         $lastDestdiv = $this->applyLookback($this->getLastSync('destdiv'), $lookbackDays);
+        $anagraCodPagaCol = $this->resolveAnagraCodPagaColumn();
 
-        $clientiQuery = DB::connection('sqlsrv')
-            ->table('anagra')
-            ->where('an_tipo', 'C');
+        $clientiQuery = $this->buildAnagraQuery($anagraCodPagaCol);
 
         if ($lastAnagra) {
-            $clientiQuery->where('an_ultagg', '>', $lastAnagra);
+            $clientiQuery->where('a.an_ultagg', '>', $lastAnagra);
         }
 
-        $clienti = $clientiQuery->orderBy('an_ultagg')->get();
+        $clienti = $clientiQuery->orderBy('a.an_ultagg')->get();
 
         $clientiCount = 0;
         $maxAnagra = $lastAnagra;
 
         foreach ($clienti as $c) {
-            $cliente = Cliente::updateOrCreate(
+            Cliente::updateOrCreate(
                 ['codice_esterno' => $c->an_conto],
-                [
-                    'nome' => trim($c->an_descr1 . ' ' . $c->an_descr2),
-                    'p_iva' => $c->an_pariva,
-                    'email' => $c->an_email,
-                    'telefono' => $c->an_telef,
-                    'indirizzo' => $c->an_indir,
-                    'cap' => $c->an_cap,
-                    'citta' => $c->an_citta,
-                    'provincia' => $c->an_prov,
-                ]
+                $this->mapClientePayload($c)
             );
 
             $clientiCount++;
@@ -77,25 +68,14 @@ class SincronizzaClienti extends Command
 
             $missingConti = $conti->diff($clientiLocal->keys());
             if ($missingConti->isNotEmpty()) {
-                $missing = DB::connection('sqlsrv')
-                    ->table('anagra')
-                    ->where('an_tipo', 'C')
-                    ->whereIn('an_conto', $missingConti)
+                $missing = $this->buildAnagraQuery($anagraCodPagaCol)
+                    ->whereIn('a.an_conto', $missingConti)
                     ->get();
 
                 foreach ($missing as $c) {
                     $cliente = Cliente::updateOrCreate(
                         ['codice_esterno' => $c->an_conto],
-                        [
-                            'nome' => trim($c->an_descr1 . ' ' . $c->an_descr2),
-                            'p_iva' => $c->an_pariva,
-                            'email' => $c->an_email,
-                            'telefono' => $c->an_telef,
-                            'indirizzo' => $c->an_indir,
-                            'cap' => $c->an_cap,
-                            'citta' => $c->an_citta,
-                            'provincia' => $c->an_prov,
-                        ]
+                        $this->mapClientePayload($c)
                     );
                     $clientiLocal->put($c->an_conto, $cliente);
                 }
@@ -184,6 +164,107 @@ class SincronizzaClienti extends Command
         }
 
         return $lastSync->copy()->subDays($days);
+    }
+
+    private function buildAnagraQuery(?string $anagraCodPagaCol)
+    {
+        $query = DB::connection('sqlsrv')
+            ->table('anagra as a')
+            ->where('a.an_tipo', 'C')
+            ->select('a.*');
+
+        if ($anagraCodPagaCol && $this->canJoinTabPaga()) {
+            $query->leftJoin('tabpaga as tp', "tp.tb_codpaga", '=', "a.{$anagraCodPagaCol}")
+                ->addSelect(DB::raw("a.{$anagraCodPagaCol} as an_codpaga_sync"))
+                ->addSelect(DB::raw('tp.tb_despaga as tb_despaga_sync'));
+        }
+
+        return $query;
+    }
+
+    private function mapClientePayload(object $c): array
+    {
+        $payload = [
+            'nome' => trim(((string) $c->an_descr1) . ' ' . ((string) $c->an_descr2)),
+            'p_iva' => $c->an_pariva,
+            'email' => $c->an_email,
+            'telefono' => $c->an_telef,
+            'indirizzo' => $c->an_indir,
+            'cap' => $c->an_cap,
+            'citta' => $c->an_citta,
+            'provincia' => $c->an_prov,
+        ];
+
+        $hasPaymentColumns = property_exists($c, 'an_codpaga_sync')
+            || property_exists($c, 'an_codpaga')
+            || property_exists($c, 'an_codpag')
+            || property_exists($c, 'tb_despaga_sync');
+
+        if (!$hasPaymentColumns) {
+            return $payload;
+        }
+
+        $formaCodice = $this->normalizePaymentCode($c);
+        $formaDescrizione = trim((string) ($c->tb_despaga_sync ?? ''));
+        if ($formaDescrizione === '') {
+            $formaDescrizione = null;
+        }
+
+        $payload['forma_pagamento_codice'] = $formaCodice;
+        $payload['forma_pagamento_descrizione'] = $formaDescrizione;
+        $payload['richiede_pagamento_manutentore'] = $formaCodice === 40;
+
+        return $payload;
+    }
+
+    private function normalizePaymentCode(object $c): ?int
+    {
+        $candidate = $c->an_codpaga_sync ?? $c->an_codpaga ?? $c->an_codpag ?? null;
+        return is_numeric($candidate) ? (int) $candidate : null;
+    }
+
+    private function resolveAnagraCodPagaColumn(): ?string
+    {
+        try {
+            $columns = DB::connection('sqlsrv')->getSchemaBuilder()->getColumnListing('anagra');
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        $columnMap = [];
+        foreach ($columns as $col) {
+            $columnMap[strtolower($col)] = $col;
+        }
+
+        foreach (['an_codpaga', 'an_codpag'] as $candidate) {
+            if (isset($columnMap[$candidate])) {
+                return $columnMap[$candidate];
+            }
+        }
+
+        return null;
+    }
+
+    private function canJoinTabPaga(): bool
+    {
+        if ($this->tabpagaJoinAvailable !== null) {
+            return $this->tabpagaJoinAvailable;
+        }
+
+        try {
+            $columns = DB::connection('sqlsrv')->getSchemaBuilder()->getColumnListing('tabpaga');
+        } catch (\Throwable $e) {
+            $this->tabpagaJoinAvailable = false;
+            return false;
+        }
+
+        $columnMap = [];
+        foreach ($columns as $col) {
+            $columnMap[strtolower($col)] = true;
+        }
+
+        $this->tabpagaJoinAvailable = isset($columnMap['tb_codpaga']);
+        return $this->tabpagaJoinAvailable;
     }
 
     private function resolveDestdivUltaggColumn(): ?string

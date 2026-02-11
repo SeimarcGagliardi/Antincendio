@@ -42,13 +42,31 @@
 
     <h2>Dati Cliente</h2>
     <div class="dati-cliente">
+        @php
+            $richiedeIncassoTecnico = (bool) ($intervento->cliente->richiede_pagamento_manutentore ?? false);
+            $formaPagamentoBusiness = trim((string) ($intervento->cliente->forma_pagamento_descrizione ?? ''));
+            $metodoIncasso = mb_strtoupper(trim((string) ($intervento->pagamento_metodo ?? '')));
+            $importoIncassato = $intervento->pagamento_importo;
+        @endphp
         <strong>Ragione Sociale:</strong> {{ $intervento->cliente->nome }}<br>
         <strong>P.IVA:</strong> {{ $intervento->cliente->p_iva ?? '-' }}<br>
         <strong>Indirizzo:</strong>
         {{ $intervento->sede->indirizzo ?? $intervento->cliente->indirizzo }},
         {{ $intervento->sede->cap ?? $intervento->cliente->cap }}
         {{ $intervento->sede->citta ?? $intervento->cliente->citta }} ({{ $intervento->sede->provincia ?? $intervento->cliente->provincia }})<br>
-        <strong>Sede:</strong> {{ $intervento->sede->nome ?? 'Sede Principale' }}
+        <strong>Sede:</strong> {{ $intervento->sede->nome ?? 'Sede Principale' }}<br>
+        @if($richiedeIncassoTecnico)
+            <strong>Forma pagamento:</strong> ALLA CONSEGNA (incasso da manutentore)<br>
+            <strong>Metodo incasso:</strong> {{ $metodoIncasso !== '' ? $metodoIncasso : 'NON INDICATO' }}<br>
+            <strong>Importo incassato:</strong>
+            @if($importoIncassato !== null)
+                € {{ number_format((float) $importoIncassato, 2, ',', '.') }}
+            @else
+                NON INDICATO
+            @endif
+        @else
+            <strong>Forma pagamento:</strong> {{ $formaPagamentoBusiness !== '' ? $formaPagamentoBusiness : '-' }}
+        @endif
     </div>
 
     <h2>Presidi Verificati</h2>

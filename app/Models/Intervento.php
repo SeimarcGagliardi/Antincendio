@@ -17,11 +17,20 @@ class Intervento extends Model
         'stato',
         'zona',
         'note',
+        'pagamento_metodo',
+        'pagamento_importo',
         'firma_cliente_base64',
+        'fatturato',
+        'fatturazione_payload',
+        'fatturato_at',
+        'fattura_ref_data',
+    ];
+    protected $casts = [
         'fatturato' => 'boolean',
         'fatturazione_payload' => 'array',
         'fatturato_at' => 'datetime',
         'fattura_ref_data' => 'array',
+        'pagamento_importo' => 'decimal:2',
     ];
 
     public function cliente()

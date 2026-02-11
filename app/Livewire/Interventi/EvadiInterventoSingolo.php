@@ -25,6 +25,10 @@ class EvadiInterventoSingolo extends Component
     public $input = [];
     public $vistaSchede = true;
     public $durataEffettiva;
+    public bool $richiedePagamentoManutentore = false;
+    public ?string $formaPagamentoDescrizione = null;
+    public ?string $pagamentoMetodo = null;
+    public $pagamentoImporto = null;
     public array $marcaSuggestions = [];
     public array $previewSostituzione = [];
     public array $previewNuovo = [];
@@ -236,6 +240,15 @@ public function salvaNuovoPresidio()
             ...$this->interventoRelations()
         );
         $this->durataEffettiva = (int) ($this->intervento->durata_effettiva ?? 0);
+        $this->richiedePagamentoManutentore = (bool) ($this->intervento->cliente?->richiede_pagamento_manutentore ?? false);
+        $this->formaPagamentoDescrizione = trim((string) ($this->intervento->cliente?->forma_pagamento_descrizione ?? ''));
+        if ($this->formaPagamentoDescrizione === '') {
+            $this->formaPagamentoDescrizione = null;
+        }
+        $this->pagamentoMetodo = $this->normalizePagamentoMetodo($this->intervento->pagamento_metodo);
+        $this->pagamentoImporto = $this->intervento->pagamento_importo !== null
+            ? number_format((float) $this->intervento->pagamento_importo, 2, '.', '')
+            : null;
         $this->showControlloAnnualeIdranti = $this->isMeseMinutaggioPiuAlto();
         $this->marcaSuggestions = $this->caricaMarcheSuggerite();
         $this->tipiIdranti = TipoPresidio::whereRaw('LOWER(categoria) = ?', ['idrante'])
@@ -706,6 +719,19 @@ public function salvaNuovoPresidio()
         }
     }
 
+    public function updatedPagamentoMetodo($value): void
+    {
+        $this->pagamentoMetodo = $this->normalizePagamentoMetodo($value);
+        $this->persistPagamentoIntervento();
+    }
+
+    public function updatedPagamentoImporto($value): void
+    {
+        $normalized = $this->normalizePagamentoImporto($value);
+        $this->pagamentoImporto = $normalized !== null ? number_format($normalized, 2, '.', '') : null;
+        $this->persistPagamentoIntervento();
+    }
+
     public function toggleAnomalia(int $piId, int $anomaliaId, $checked): void
     {
         $checked = filter_var($checked, FILTER_VALIDATE_BOOL);
@@ -875,6 +901,22 @@ public function salvaNuovoPresidio()
             $this->messaggioErrore ='Verifica tutti i presidi prima di completare l’intervento.';
             return;
         }
+
+        if ($this->richiedePagamentoManutentore) {
+            $metodo = $this->normalizePagamentoMetodo($this->pagamentoMetodo);
+            $importo = $this->normalizePagamentoImporto($this->pagamentoImporto);
+
+            if (!$metodo || $importo === null) {
+                $this->messaggioErrore = 'Pagamento obbligatorio: seleziona metodo (POS/ASSEGNO/CONTANTI) e importo incassato.';
+                return;
+            }
+
+            $this->pagamentoMetodo = $metodo;
+            $this->pagamentoImporto = number_format($importo, 2, '.', '');
+        }
+
+        $this->persistPagamentoIntervento();
+
         if ($this->interventoCompletabile) {
             foreach ($this->intervento->presidiIntervento as $pi) {
                 $this->salvaPresidio($pi->id);
@@ -905,6 +947,8 @@ public function salvaNuovoPresidio()
             $this->intervento->update([
                 'stato' => 'Completato',
                 'durata_effettiva' => $durataEffettiva,
+                'pagamento_metodo' => $this->intervento->pagamento_metodo,
+                'pagamento_importo' => $this->intervento->pagamento_importo,
             ]);
             $this->accodaMailRapportinoInterno();
             $this->messaggioSuccesso ='Intervento evaso correttamente. Apertura rapportino in corso...';
@@ -1208,6 +1252,50 @@ public function salvaNuovoPresidio()
         return $marca === '' ? null : mb_strtoupper($marca);
     }
 
+    private function normalizePagamentoMetodo($metodo): ?string
+    {
+        $metodo = mb_strtoupper(trim((string) $metodo));
+        if ($metodo === '') {
+            return null;
+        }
+
+        return in_array($metodo, ['POS', 'ASSEGNO', 'CONTANTI'], true) ? $metodo : null;
+    }
+
+    private function normalizePagamentoImporto($importo): ?float
+    {
+        if ($importo === null) {
+            return null;
+        }
+
+        $value = trim((string) $importo);
+        if ($value === '') {
+            return null;
+        }
+
+        $value = str_replace(',', '.', $value);
+        if (!is_numeric($value)) {
+            return null;
+        }
+
+        $num = round((float) $value, 2);
+        return $num > 0 ? $num : null;
+    }
+
+    private function persistPagamentoIntervento(): void
+    {
+        if (!$this->richiedePagamentoManutentore) {
+            $this->intervento->pagamento_metodo = null;
+            $this->intervento->pagamento_importo = null;
+            $this->intervento->save();
+            return;
+        }
+
+        $this->intervento->pagamento_metodo = $this->normalizePagamentoMetodo($this->pagamentoMetodo);
+        $this->intervento->pagamento_importo = $this->normalizePagamentoImporto($this->pagamentoImporto);
+        $this->intervento->save();
+    }
+
     private function isMeseMinutaggioPiuAlto(): bool
     {
         if (!$this->intervento?->data_intervento) {
@@ -1463,6 +1551,17 @@ public function salvaNuovoPresidio()
             $this->durataEffettiva = max(0, (int) $payload['durataEffettiva']);
             $this->intervento->durata_effettiva = $this->durataEffettiva;
             $this->intervento->save();
+        }
+
+        if (array_key_exists('pagamentoMetodo', $payload) || array_key_exists('pagamentoImporto', $payload)) {
+            if (array_key_exists('pagamentoMetodo', $payload)) {
+                $this->pagamentoMetodo = $this->normalizePagamentoMetodo($payload['pagamentoMetodo'] ?? null);
+            }
+            if (array_key_exists('pagamentoImporto', $payload)) {
+                $importo = $this->normalizePagamentoImporto($payload['pagamentoImporto'] ?? null);
+                $this->pagamentoImporto = $importo !== null ? number_format($importo, 2, '.', '') : null;
+            }
+            $this->persistPagamentoIntervento();
         }
 
         if ($updated > 0) {
