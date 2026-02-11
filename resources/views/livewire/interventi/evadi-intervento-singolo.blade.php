@@ -18,7 +18,7 @@
             <div>Zona: <span class="font-medium">{{ $intervento->cliente->zona ?? '—' }}</span></div>
             <div>Telefono: <span class="font-medium">{{ $intervento->cliente->telefono ?? '—' }}</span></div>
             <div>Email: <span class="font-medium">{{ $intervento->cliente->email ?? '—' }}</span></div>
-            <div>Note: <span class="font-medium">{{ $intervento->cliente->note ?? '—' }}</span></div>
+            <div>Forma pagamento: <span class="font-medium">{{ $formaPagamentoDescrizione ?: '—' }}</span></div>
         </div>
     </div>
 
@@ -53,6 +53,43 @@
                 {{ $formaPagamentoDescrizione ?: 'Non disponibile' }}
             </div>
         @endif
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div class="bg-yellow-50 border-2 border-yellow-300 rounded p-3 shadow-sm">
+            <div class="text-sm font-extrabold text-yellow-900 uppercase tracking-wide">Note Intervento</div>
+            <div class="mt-1 text-base font-bold text-gray-900 whitespace-pre-wrap">{{ $noteInterventoGenerali ?: 'Nessuna nota intervento.' }}</div>
+            <div class="mt-3">
+                <label class="block text-xs font-semibold text-gray-700 mb-1">Modifica rapida note intervento</label>
+                <textarea wire:model.defer="noteInterventoGenerali"
+                          rows="3"
+                          class="w-full border-gray-300 rounded px-2 py-2 text-sm"
+                          placeholder="Inserisci note intervento..."></textarea>
+                <button wire:click="salvaNoteInterventoGenerali"
+                        class="mt-2 px-3 py-2 text-xs font-semibold rounded bg-yellow-600 text-white hover:bg-yellow-700">
+                    Salva note intervento
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-blue-50 border-2 border-blue-300 rounded p-3 shadow-sm">
+            <div class="text-sm font-extrabold text-blue-900 uppercase tracking-wide">Note Anagrafica Cliente</div>
+            <div class="mt-1 text-base font-bold text-gray-900 whitespace-pre-wrap">{{ $noteClienteAnagrafica ?: 'Nessuna nota anagrafica.' }}</div>
+            <div class="mt-3">
+                <label class="block text-xs font-semibold text-gray-700 mb-1">Modifica rapida note anagrafica cliente</label>
+                <textarea wire:model.defer="noteClienteAnagrafica"
+                          rows="3"
+                          class="w-full border-gray-300 rounded px-2 py-2 text-sm"
+                          placeholder="Inserisci note anagrafica cliente..."></textarea>
+                <button wire:click="salvaNoteClienteAnagrafica"
+                        class="mt-2 px-3 py-2 text-xs font-semibold rounded bg-blue-600 text-white hover:bg-blue-700">
+                    Salva note anagrafica
+                </button>
+            </div>
+            <div class="mt-2 text-[11px] font-semibold text-blue-800">
+                Le note anagrafica salvate qui non vengono sovrascritte dalla sync clienti Business.
+            </div>
+        </div>
     </div>
 
     @php
@@ -1322,6 +1359,14 @@ function initOfflineSync() {
             }
             if (model === 'pagamentoImporto') {
                 payload.pagamentoImporto = getElementValue(el);
+                return;
+            }
+            if (model === 'noteInterventoGenerali') {
+                payload.noteInterventoGenerali = getElementValue(el);
+                return;
+            }
+            if (model === 'noteClienteAnagrafica') {
+                payload.noteClienteAnagrafica = getElementValue(el);
                 return;
             }
 

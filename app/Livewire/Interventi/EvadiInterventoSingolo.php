@@ -29,6 +29,8 @@ class EvadiInterventoSingolo extends Component
     public ?string $formaPagamentoDescrizione = null;
     public ?string $pagamentoMetodo = null;
     public $pagamentoImporto = null;
+    public ?string $noteInterventoGenerali = null;
+    public ?string $noteClienteAnagrafica = null;
     public array $marcaSuggestions = [];
     public array $previewSostituzione = [];
     public array $previewNuovo = [];
@@ -249,6 +251,8 @@ public function salvaNuovoPresidio()
         $this->pagamentoImporto = $this->intervento->pagamento_importo !== null
             ? number_format((float) $this->intervento->pagamento_importo, 2, '.', '')
             : null;
+        $this->noteInterventoGenerali = $this->intervento->note;
+        $this->noteClienteAnagrafica = $this->intervento->cliente?->note;
         $this->showControlloAnnualeIdranti = $this->isMeseMinutaggioPiuAlto();
         $this->marcaSuggestions = $this->caricaMarcheSuggerite();
         $this->tipiIdranti = TipoPresidio::whereRaw('LOWER(categoria) = ?', ['idrante'])
@@ -730,6 +734,28 @@ public function salvaNuovoPresidio()
         $normalized = $this->normalizePagamentoImporto($value);
         $this->pagamentoImporto = $normalized !== null ? number_format($normalized, 2, '.', '') : null;
         $this->persistPagamentoIntervento();
+    }
+
+    public function salvaNoteInterventoGenerali(): void
+    {
+        $this->intervento->note = $this->noteInterventoGenerali;
+        $this->intervento->save();
+        $this->messaggioSuccesso = 'Note intervento salvate.';
+    }
+
+    public function salvaNoteClienteAnagrafica(): void
+    {
+        $cliente = $this->intervento->cliente;
+        if (!$cliente) {
+            $this->messaggioErrore = 'Cliente non trovato.';
+            return;
+        }
+
+        $cliente->note = $this->noteClienteAnagrafica;
+        $cliente->save();
+
+        $this->intervento->setRelation('cliente', $cliente->fresh());
+        $this->messaggioSuccesso = 'Note anagrafica cliente salvate.';
     }
 
     public function toggleAnomalia(int $piId, int $anomaliaId, $checked): void
@@ -1562,6 +1588,23 @@ public function salvaNuovoPresidio()
                 $this->pagamentoImporto = $importo !== null ? number_format($importo, 2, '.', '') : null;
             }
             $this->persistPagamentoIntervento();
+        }
+
+        if (array_key_exists('noteInterventoGenerali', $payload)) {
+            $this->noteInterventoGenerali = is_scalar($payload['noteInterventoGenerali'])
+                ? (string) $payload['noteInterventoGenerali']
+                : null;
+            $this->intervento->note = $this->noteInterventoGenerali;
+            $this->intervento->save();
+        }
+
+        if (array_key_exists('noteClienteAnagrafica', $payload) && $this->intervento->cliente) {
+            $this->noteClienteAnagrafica = is_scalar($payload['noteClienteAnagrafica'])
+                ? (string) $payload['noteClienteAnagrafica']
+                : null;
+            $this->intervento->cliente->note = $this->noteClienteAnagrafica;
+            $this->intervento->cliente->save();
+            $this->intervento->setRelation('cliente', $this->intervento->cliente->fresh());
         }
 
         if ($updated > 0) {

@@ -194,6 +194,8 @@ class SincronizzaClienti extends Command
             'citta' => $c->an_citta,
             'provincia' => $c->an_prov,
         ];
+        // NB: non includere "note" qui: le note anagrafica gestite nel gestionale
+        // non devono essere sovrascritte dalla sincronizzazione Business.
 
         $hasPaymentColumns = property_exists($c, 'an_codpaga_sync')
             || property_exists($c, 'an_codpaga')

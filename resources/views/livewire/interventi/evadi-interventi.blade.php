@@ -43,7 +43,10 @@
                                     <div>Zona: {{ $intervento->cliente->zona ?? '—' }}</div>
                                     <div>Tel: {{ $intervento->cliente->telefono ?? '—' }} · Email: {{ $intervento->cliente->email ?? '—' }}</div>
                                     @if(!empty($intervento->cliente->note))
-                                        <div class="italic">Note: {{ $intervento->cliente->note }}</div>
+                                        <div class="mt-2 p-2 rounded border-2 border-blue-200 bg-blue-50">
+                                            <div class="text-[11px] uppercase font-bold text-blue-800">Note Anagrafica</div>
+                                            <div class="text-sm font-extrabold text-gray-900 whitespace-pre-wrap">{{ $intervento->cliente->note }}</div>
+                                        </div>
                                     @endif
                                 </div>
                             </td>
@@ -60,6 +63,12 @@
                             <td>{{ \Carbon\Carbon::parse($intervento->data_intervento)->format('d/m/Y') }}</td>
                             <td>{{ $intervento->stato }}</td>
                             <td class="min-w-[220px]">
+                                @if(!empty($noteByIntervento[$intervento->id]))
+                                    <div class="mb-2 p-2 rounded border-2 border-yellow-200 bg-yellow-50">
+                                        <div class="text-[11px] uppercase font-bold text-yellow-800">Note Intervento</div>
+                                        <div class="text-sm font-extrabold text-gray-900 whitespace-pre-wrap">{{ $noteByIntervento[$intervento->id] }}</div>
+                                    </div>
+                                @endif
                                 <div class="flex items-start gap-2">
                                     <textarea wire:model.defer="noteByIntervento.{{ $intervento->id }}" rows="2" class="w-full text-xs border-gray-300 rounded px-2 py-1" placeholder="Note intervento"></textarea>
                                     <button wire:click="salvaNoteIntervento({{ $intervento->id }})" class="btn btn-xs btn-primary whitespace-nowrap">
@@ -101,11 +110,20 @@
                                     <div>Zona: {{ $intervento->cliente->zona ?? '—' }}</div>
                                     <div>Tel: {{ $intervento->cliente->telefono ?? '—' }} · Email: {{ $intervento->cliente->email ?? '—' }}</div>
                                     @if(!empty($intervento->cliente->note))
-                                        <div class="italic">Note: {{ $intervento->cliente->note }}</div>
+                                        <div class="mt-2 p-2 rounded border-2 border-blue-200 bg-blue-50">
+                                            <div class="text-[11px] uppercase font-bold text-blue-800">Note Anagrafica</div>
+                                            <div class="text-sm font-extrabold text-gray-900 whitespace-pre-wrap">{{ $intervento->cliente->note }}</div>
+                                        </div>
                                     @endif
                                 </div>
                                 <div class="mt-2">
                                     <label class="text-xs text-gray-600">Note intervento</label>
+                                    @if(!empty($noteByIntervento[$intervento->id]))
+                                        <div class="mt-1 mb-2 p-2 rounded border-2 border-yellow-200 bg-yellow-50">
+                                            <div class="text-[11px] uppercase font-bold text-yellow-800">Note Intervento</div>
+                                            <div class="text-sm font-extrabold text-gray-900 whitespace-pre-wrap">{{ $noteByIntervento[$intervento->id] }}</div>
+                                        </div>
+                                    @endif
                                     <div class="flex items-start gap-2 mt-1">
                                         <textarea wire:model.defer="noteByIntervento.{{ $intervento->id }}" rows="2" class="w-full text-xs border-gray-300 rounded px-2 py-1" placeholder="Note intervento"></textarea>
                                         <button wire:click="salvaNoteIntervento({{ $intervento->id }})" class="btn btn-xs btn-primary whitespace-nowrap">
