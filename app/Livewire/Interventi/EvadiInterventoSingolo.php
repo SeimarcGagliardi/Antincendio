@@ -6,8 +6,7 @@ use Livewire\Component;
 use App\Models\Intervento;
 use App\Models\Presidio;
 use App\Models\PresidioIntervento;
-
-use App\Models\PresidioRitirato;
+use App\Models\PresidioInterventoAnomalia;
 use App\Models\Anomalia;
 use App\Models\TipoEstintore;
 use App\Models\InterventoTecnico;
@@ -61,6 +60,7 @@ public function apriFormNuovoPresidio()
         'tipo_estintore_id' => null,
         'data_serbatoio' => null,
         'marca_serbatoio' => null,
+        'marca_mb' => false,
         'data_ultima_revisione' => null,
         'categoria' => 'Estintore',
         'idrante_tipo_id' => null,
@@ -69,10 +69,55 @@ public function apriFormNuovoPresidio()
         'idrante_sotto_suolo' => false,
         'porta_tipo_id' => null,
         'note' => '',
-        'usa_ritiro' => false, // nuovo flag
+        'usa_ritiro' => false,
     ];
     $this->previewNuovo = [];
     
+}
+
+public function updatedNuovoPresidioCategoria($categoria): void
+{
+    $categoria = (string) $categoria;
+    if ($categoria !== 'Estintore') {
+        $this->nuovoPresidio['tipo_estintore_id'] = null;
+        $this->nuovoPresidio['data_serbatoio'] = null;
+        $this->nuovoPresidio['data_ultima_revisione'] = null;
+        $this->nuovoPresidio['marca_serbatoio'] = null;
+        $this->nuovoPresidio['marca_mb'] = false;
+        $this->nuovoPresidio['usa_ritiro'] = false;
+    }
+    if ($categoria !== 'Idrante') {
+        $this->nuovoPresidio['idrante_tipo_id'] = null;
+        $this->nuovoPresidio['idrante_lunghezza'] = null;
+        $this->nuovoPresidio['idrante_sopra_suolo'] = false;
+        $this->nuovoPresidio['idrante_sotto_suolo'] = false;
+    }
+    if ($categoria !== 'Porta') {
+        $this->nuovoPresidio['porta_tipo_id'] = null;
+    }
+
+    if ($categoria !== 'Estintore') {
+        $this->previewNuovo = [];
+    } else {
+        $this->aggiornaPreviewNuovo();
+    }
+}
+
+public function updatedNuovoPresidioMarcaMb($checked): void
+{
+    $enabled = filter_var($checked, FILTER_VALIDATE_BOOL);
+    if ($enabled) {
+        $this->nuovoPresidio['marca_serbatoio'] = 'MB';
+    } elseif ($this->normalizeMarca($this->nuovoPresidio['marca_serbatoio'] ?? null) === 'MB') {
+        $this->nuovoPresidio['marca_serbatoio'] = null;
+    }
+    $this->aggiornaPreviewNuovo();
+}
+
+public function updatedNuovoPresidioMarcaSerbatoio($value): void
+{
+    $this->nuovoPresidio['marca_mb'] = $this->normalizeMarca($value) === 'MB';
+    $this->aggiornaPreviewNuovo();
 }
 
 public function salvaNuovoPresidio()
@@ -85,18 +130,19 @@ public function salvaNuovoPresidio()
             ->where('tipo_estintore_id', $this->nuovoPresidio['tipo_estintore_id'])
             ->first();
     
-        if (!$giacenza || $giacenza->quantita_disponibile < 1) {
+        if (!$giacenza || (int) $giacenza->quantita < 1) {
             $this->messaggioErrore = 'Nessuna giacenza disponibile per questo tipo di presidio.';
             return;
         }
     
-        $giacenza->decrement('quantita_disponibile');
+        $giacenza->decrement('quantita');
     }
     $progressivo = Presidio::prossimoProgressivo($clienteId, $sedeId, $categoria);
 
     $tipoEstintoreId = $categoria === 'Estintore' ? $this->nuovoPresidio['tipo_estintore_id'] : null;
     $dataSerbatoio = $categoria === 'Estintore' ? $this->nuovoPresidio['data_serbatoio'] : null;
-    $marcaSerbatoio = $categoria === 'Estintore' ? $this->normalizeMarca($this->nuovoPresidio['marca_serbatoio'] ?? null) : null;
+    $marcaInput = ($this->nuovoPresidio['marca_mb'] ?? false) ? 'MB' : ($this->nuovoPresidio['marca_serbatoio'] ?? null);
+    $marcaSerbatoio = $categoria === 'Estintore' ? $this->normalizeMarca($marcaInput) : null;
     $dataUltimaRev = $categoria === 'Estintore' ? ($this->nuovoPresidio['data_ultima_revisione'] ?? null) : null;
 
     $idranteTipoId = $categoria === 'Idrante' ? ($this->nuovoPresidio['idrante_tipo_id'] ?? null) : null;
@@ -132,7 +178,12 @@ public function salvaNuovoPresidio()
     ]);
 
     // Ricarico l'intervento completo con il nuovo legame
-    $this->intervento->load('presidiIntervento.presidio.tipoEstintore.colore', 'presidiIntervento.presidio.idranteTipoRef', 'presidiIntervento.presidio.portaTipoRef');
+    $this->intervento->load(
+        'presidiIntervento.presidio.tipoEstintore.colore',
+        'presidiIntervento.presidio.idranteTipoRef',
+        'presidiIntervento.presidio.portaTipoRef',
+        'presidiIntervento.anomalieItems.anomalia'
+    );
     
     // Inizializzazione sicura input
         $this->input[$pi->id] = [
@@ -140,11 +191,13 @@ public function salvaNuovoPresidio()
             'note' => null,
             'esito' => 'non_verificato',
             'anomalie' => [],
+            'anomalie_riparate' => [],
             'sostituito_con' => 0,
             'sostituzione' => false,
             'nuovo_tipo_estintore_id' => null,
             'nuova_data_serbatoio' => null,
             'nuova_marca_serbatoio' => $presidio->marca_serbatoio,
+            'nuova_marca_mb' => $this->normalizeMarca($presidio->marca_serbatoio) === 'MB',
             'nuova_data_ultima_revisione' => $presidio->data_ultima_revisione,
             'nuovo_idrante_tipo_id' => $presidio->idrante_tipo_id,
             'nuovo_idrante_lunghezza' => $presidio->idrante_lunghezza,
@@ -164,12 +217,26 @@ public function salvaNuovoPresidio()
     
     public function mount(Intervento $intervento)
     {
-        $this->intervento = $intervento->load('cliente', 'sede', 'tecnici', 'presidiIntervento.presidio.tipoEstintore.colore', 'presidiIntervento.presidio.idranteTipoRef', 'presidiIntervento.presidio.portaTipoRef');
+        $this->intervento = $intervento->load(
+            'cliente',
+            'sede',
+            'tecnici',
+            'presidiIntervento.presidio.tipoEstintore.colore',
+            'presidiIntervento.presidio.idranteTipoRef',
+            'presidiIntervento.presidio.portaTipoRef',
+            'presidiIntervento.anomalieItems.anomalia'
+        );
         $this->durataEffettiva = $this->intervento->durata_effettiva;
         $this->showControlloAnnualeIdranti = $this->isMeseMinutaggioPiuAlto();
         $this->marcaSuggestions = $this->caricaMarcheSuggerite();
-        $this->tipiIdranti = TipoPresidio::where('categoria', 'Idrante')->orderBy('nome')->pluck('nome', 'id')->all();
-        $this->tipiPorte = TipoPresidio::where('categoria', 'Porta')->orderBy('nome')->pluck('nome', 'id')->all();
+        $this->tipiIdranti = TipoPresidio::whereRaw('LOWER(categoria) = ?', ['idrante'])
+            ->orderBy('nome')
+            ->pluck('nome', 'id')
+            ->all();
+        $this->tipiPorte = TipoPresidio::whereRaw('LOWER(categoria) = ?', ['porta'])
+            ->orderBy('nome')
+            ->pluck('nome', 'id')
+            ->all();
 
         // Se non esistono ancora presidi_intervento, generarli
         if ($this->intervento->presidiIntervento->isEmpty()) {
@@ -190,12 +257,18 @@ public function salvaNuovoPresidio()
             }
     
             // Reload dopo la creazione
-            $this->intervento->load('presidiIntervento.presidio.tipoEstintore.colore', 'presidiIntervento.presidio.idranteTipoRef', 'presidiIntervento.presidio.portaTipoRef');
+            $this->intervento->load(
+                'presidiIntervento.presidio.tipoEstintore.colore',
+                'presidiIntervento.presidio.idranteTipoRef',
+                'presidiIntervento.presidio.portaTipoRef',
+                'presidiIntervento.anomalieItems.anomalia'
+            );
         }
     
         // Inizializzazione input per ogni presidio_intervento
         foreach ($this->intervento->presidiIntervento as $pi) {
             $presidio = $pi->presidio;
+            [$anomalieIds, $anomalieRiparate] = $this->extractAnomalieState($pi);
         
             $deveEssereRitirato = $this->verificaRitiroObbligato($presidio);
         
@@ -203,12 +276,14 @@ public function salvaNuovoPresidio()
                 'ubicazione' => $presidio->ubicazione,
                 'note' => $pi->note,
                 'esito' => $pi->esito ?? 'non_verificato',
-                'anomalie' => is_array($pi->anomalie) ? $pi->anomalie : [],
+                'anomalie' => $anomalieIds,
+                'anomalie_riparate' => $anomalieRiparate,
                 'sostituito_con' => Presidio::find($pi->sostituito_con_presidio_id) ?? 0,
                 'sostituzione' => false,
                 'nuovo_tipo_estintore_id' => null,
                 'nuova_data_serbatoio' => null,
                 'nuova_marca_serbatoio' => $presidio->marca_serbatoio,
+                'nuova_marca_mb' => $this->normalizeMarca($presidio->marca_serbatoio) === 'MB',
                 'nuova_data_ultima_revisione' => $presidio->data_ultima_revisione,
                 'nuovo_idrante_tipo_id' => $presidio->idrante_tipo_id,
                 'nuovo_idrante_lunghezza' => $presidio->idrante_lunghezza,
@@ -335,7 +410,12 @@ public function salvaNuovoPresidio()
 
         $this->editMode[$piId] = false;
         $this->messaggioSuccesso = 'Presidio aggiornato.';
-        $this->intervento->load('presidiIntervento.presidio.tipoEstintore.colore', 'presidiIntervento.presidio.idranteTipoRef', 'presidiIntervento.presidio.portaTipoRef');
+        $this->intervento->load(
+            'presidiIntervento.presidio.tipoEstintore.colore',
+            'presidiIntervento.presidio.idranteTipoRef',
+            'presidiIntervento.presidio.portaTipoRef',
+            'presidiIntervento.anomalieItems.anomalia'
+        );
 
         if (isset($this->input[$piId])) {
             $this->input[$piId]['ubicazione'] = $p->ubicazione;
@@ -386,17 +466,47 @@ public function salvaNuovoPresidio()
             return;
         }
 
+        if ($field === 'nuova_marca_mb') {
+            $enabled = filter_var($value, FILTER_VALIDATE_BOOL);
+            if ($enabled) {
+                $this->input[$piId]['nuova_marca_serbatoio'] = 'MB';
+            } elseif ($this->normalizeMarca($this->input[$piId]['nuova_marca_serbatoio'] ?? null) === 'MB') {
+                $this->input[$piId]['nuova_marca_serbatoio'] = null;
+            }
+            $this->aggiornaPreviewSostituzione($piId);
+            return;
+        }
+
+        if ($field === 'nuova_marca_serbatoio') {
+            $this->input[$piId]['nuova_marca_mb'] = $this->normalizeMarca($value) === 'MB';
+            $this->aggiornaPreviewSostituzione($piId);
+            return;
+        }
+
         if ($field === 'ubicazione') {
             $pi->presidio?->update(['ubicazione' => $this->input[$piId]['ubicazione'] ?? $value]);
             return;
         }
 
-        if (in_array($field, ['esito', 'note', 'anomalie', 'usa_ritiro'], true)) {
-            $payload = $value;
-            if ($field === 'anomalie') {
-                $payload = $this->input[$piId]['anomalie'] ?? [];
-            }
-            $pi->{$field} = $payload;
+        if ($field === 'anomalie') {
+            $selected = $this->normalizeAnomalieIds($this->input[$piId]['anomalie'] ?? []);
+            $riparate = $this->normalizeAnomalieRiparate($selected, $this->input[$piId]['anomalie_riparate'] ?? []);
+            $this->input[$piId]['anomalie'] = $selected;
+            $this->input[$piId]['anomalie_riparate'] = $riparate;
+            $this->syncAnomaliePresidioIntervento($pi, $selected, $riparate);
+            return;
+        }
+
+        if ($field === 'anomalie_riparate') {
+            $selected = $this->normalizeAnomalieIds($this->input[$piId]['anomalie'] ?? []);
+            $riparate = $this->normalizeAnomalieRiparate($selected, $this->input[$piId]['anomalie_riparate'] ?? []);
+            $this->input[$piId]['anomalie_riparate'] = $riparate;
+            $this->syncAnomaliePresidioIntervento($pi, $selected, $riparate);
+            return;
+        }
+
+        if (in_array($field, ['esito', 'note', 'usa_ritiro'], true)) {
+            $pi->{$field} = $value;
             $pi->save();
         }
     }
@@ -427,7 +537,12 @@ public function salvaNuovoPresidio()
         $pi->delete();
     
         $this->messaggioSuccesso = 'Presidio rimosso dall’intervento.';
-    $this->intervento->load('presidiIntervento.presidio.tipoEstintore.colore', 'presidiIntervento.presidio.idranteTipoRef', 'presidiIntervento.presidio.portaTipoRef');
+    $this->intervento->load(
+        'presidiIntervento.presidio.tipoEstintore.colore',
+        'presidiIntervento.presidio.idranteTipoRef',
+        'presidiIntervento.presidio.portaTipoRef',
+        'presidiIntervento.anomalieItems.anomalia'
+    );
     }
     public function getAnomalieProperty()
     {
@@ -514,6 +629,8 @@ public function salvaNuovoPresidio()
             $giacenza->decrement('quantita');
         }
 
+        $nuovaMarca = ($dati['nuova_marca_mb'] ?? false) ? 'MB' : ($dati['nuova_marca_serbatoio'] ?? $vecchio->marca_serbatoio);
+
         $nuovo = new Presidio([
             'cliente_id' => $vecchio->cliente_id,
             'sede_id' => $vecchio->sede_id,
@@ -522,7 +639,7 @@ public function salvaNuovoPresidio()
             'ubicazione' => $vecchio->ubicazione,
             'tipo_estintore_id' => $cat === 'Estintore' ? ($dati['nuovo_tipo_estintore_id'] ?? null) : null,
             'data_serbatoio' => $cat === 'Estintore' ? ($dati['nuova_data_serbatoio'] ?? null) : null,
-            'marca_serbatoio' => $cat === 'Estintore' ? $this->normalizeMarca($dati['nuova_marca_serbatoio'] ?? $vecchio->marca_serbatoio) : null,
+            'marca_serbatoio' => $cat === 'Estintore' ? $this->normalizeMarca($nuovaMarca) : null,
             'data_ultima_revisione' => $cat === 'Estintore' ? ($dati['nuova_data_ultima_revisione'] ?? null) : null,
             'idrante_tipo_id' => $cat === 'Idrante' ? ($dati['nuovo_idrante_tipo_id'] ?? $vecchio->idrante_tipo_id) : null,
             'idrante_lunghezza' => $cat === 'Idrante' ? ($dati['nuovo_idrante_lunghezza'] ?? $vecchio->idrante_lunghezza) : null,
@@ -568,9 +685,12 @@ public function salvaNuovoPresidio()
 
         if (!$pi) return;
 
+        $anomalieIds = $this->normalizeAnomalieIds($dati['anomalie'] ?? []);
+        $anomalieRiparate = $this->normalizeAnomalieRiparate($anomalieIds, $dati['anomalie_riparate'] ?? []);
+
         $pi->note = $dati['note'];
         $pi->esito = $dati['esito'];
-        $pi->anomalie = $dati['anomalie'] ?? [];
+        $pi->anomalie = $anomalieIds;
         $pi->usa_ritiro = $dati['usa_ritiro'] ?? false;
 
         if ($dati['sostituzione']) {
@@ -598,6 +718,8 @@ public function salvaNuovoPresidio()
                 $giacenza->decrement('quantita');
             }
 
+            $nuovaMarca = ($dati['nuova_marca_mb'] ?? false) ? 'MB' : ($dati['nuova_marca_serbatoio'] ?? $vecchio->marca_serbatoio);
+
             $nuovo = new Presidio([
                 'cliente_id' => $vecchio->cliente_id,
                 'sede_id' => $vecchio->sede_id,
@@ -606,7 +728,7 @@ public function salvaNuovoPresidio()
                 'ubicazione' => $vecchio->ubicazione,
                 'tipo_estintore_id' => $cat === 'Estintore' ? ($dati['nuovo_tipo_estintore_id'] ?? null) : null,
             'data_serbatoio' => $cat === 'Estintore' ? ($dati['nuova_data_serbatoio'] ?? null) : null,
-            'marca_serbatoio' => $cat === 'Estintore' ? $this->normalizeMarca($dati['nuova_marca_serbatoio'] ?? $vecchio->marca_serbatoio) : null,
+            'marca_serbatoio' => $cat === 'Estintore' ? $this->normalizeMarca($nuovaMarca) : null,
             'data_ultima_revisione' => $cat === 'Estintore' ? ($dati['nuova_data_ultima_revisione'] ?? null) : null,
             'idrante_tipo_id' => $cat === 'Idrante' ? ($dati['nuovo_idrante_tipo_id'] ?? $vecchio->idrante_tipo_id) : null,
             'idrante_lunghezza' => $cat === 'Idrante' ? ($dati['nuovo_idrante_lunghezza'] ?? $vecchio->idrante_lunghezza) : null,
@@ -639,6 +761,7 @@ public function salvaNuovoPresidio()
         }
 
         $pi->save();
+        $this->syncAnomaliePresidioIntervento($pi, $anomalieIds, $anomalieRiparate);
         $this->messaggioSuccesso = 'Presidio aggiornato correttamente.';
     }
 
@@ -648,34 +771,38 @@ public function salvaNuovoPresidio()
             return;
         }
         $this->input[$id]['nuova_marca_serbatoio'] = 'MB';
+        $this->input[$id]['nuova_marca_mb'] = true;
         $this->aggiornaPreviewSostituzione($id);
     }
 
     public function setMarcaMbNuovo(): void
     {
         $this->nuovoPresidio['marca_serbatoio'] = 'MB';
+        $this->nuovoPresidio['marca_mb'] = true;
         $this->aggiornaPreviewNuovo();
     }
 
     public function aggiornaPreviewSostituzione(int $id): void
     {
         $dati = $this->input[$id] ?? [];
+        $marca = ($dati['nuova_marca_mb'] ?? false) ? 'MB' : ($dati['nuova_marca_serbatoio'] ?? null);
         $this->previewSostituzione[$id] = $this->calcolaPreviewScadenze(
             $dati['nuovo_tipo_estintore_id'] ?? null,
             $dati['nuova_data_serbatoio'] ?? null,
             $dati['nuova_data_ultima_revisione'] ?? null,
-            $dati['nuova_marca_serbatoio'] ?? null
+            $marca
         );
     }
 
     public function aggiornaPreviewNuovo(): void
     {
         $dati = $this->nuovoPresidio ?? [];
+        $marca = ($dati['marca_mb'] ?? false) ? 'MB' : ($dati['marca_serbatoio'] ?? null);
         $this->previewNuovo = $this->calcolaPreviewScadenze(
             $dati['tipo_estintore_id'] ?? null,
             $dati['data_serbatoio'] ?? null,
             $dati['data_ultima_revisione'] ?? null,
-            $dati['marca_serbatoio'] ?? null
+            $marca
         );
     }
 
@@ -791,10 +918,101 @@ public function salvaNuovoPresidio()
         return array_slice($out, 0, 2);
     }
 
+    private function extractAnomalieState(PresidioIntervento $pi): array
+    {
+        $items = $pi->relationLoaded('anomalieItems')
+            ? $pi->anomalieItems
+            : $pi->anomalieItems()->get(['anomalia_id', 'riparata']);
+
+        if ($items->isNotEmpty()) {
+            $ids = $items->pluck('anomalia_id')
+                ->filter(fn ($id) => is_numeric($id))
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+
+            $riparate = $items->mapWithKeys(function ($row) {
+                return [(int) $row->anomalia_id => (bool) $row->riparata];
+            })->all();
+
+            return [$ids, $riparate];
+        }
+
+        $ids = $this->normalizeAnomalieIds($pi->getRawOriginal('anomalie'));
+        $riparate = [];
+        foreach ($ids as $id) {
+            $riparate[$id] = false;
+        }
+
+        return [$ids, $riparate];
+    }
+
+    private function normalizeAnomalieIds($raw): array
+    {
+        if (is_string($raw)) {
+            $decoded = json_decode($raw, true);
+            $raw = is_array($decoded) ? $decoded : [];
+        }
+        if (!is_array($raw)) {
+            return [];
+        }
+
+        return collect($raw)
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function normalizeAnomalieRiparate(array $selectedIds, $raw): array
+    {
+        $selectedMap = array_fill_keys($selectedIds, true);
+        $raw = is_array($raw) ? $raw : [];
+
+        $out = [];
+        foreach ($selectedIds as $id) {
+            $out[$id] = filter_var($raw[$id] ?? false, FILTER_VALIDATE_BOOL);
+        }
+
+        // Rimuove eventuali voci fuori selezione
+        foreach (array_keys($raw) as $id) {
+            $idInt = (int) $id;
+            if (!isset($selectedMap[$idInt])) {
+                unset($out[$idInt]);
+            }
+        }
+
+        return $out;
+    }
+
+    private function syncAnomaliePresidioIntervento(PresidioIntervento $pi, array $selectedIds, array $riparateMap): void
+    {
+        $selectedIds = $this->normalizeAnomalieIds($selectedIds);
+        $riparateMap = $this->normalizeAnomalieRiparate($selectedIds, $riparateMap);
+
+        $existing = $pi->anomalieItems()->pluck('id', 'anomalia_id');
+        $toDelete = $existing->filter(fn ($id, $anomaliaId) => !in_array((int) $anomaliaId, $selectedIds, true))->values();
+
+        if ($toDelete->isNotEmpty()) {
+            PresidioInterventoAnomalia::whereIn('id', $toDelete)->delete();
+        }
+
+        foreach ($selectedIds as $anomaliaId) {
+            $pi->anomalieItems()->updateOrCreate(
+                ['anomalia_id' => $anomaliaId],
+                ['riparata' => (bool) ($riparateMap[$anomaliaId] ?? false)]
+            );
+        }
+
+        $pi->anomalie = $selectedIds;
+        $pi->save();
+    }
 
 
 
-    
+
     
 
     public function render()

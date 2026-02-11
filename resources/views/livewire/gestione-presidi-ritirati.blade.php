@@ -66,7 +66,12 @@
                     <td class="p-2">
                         @php
                             $anomalie = collect($p->presidioIntervento?->anomalie ?? [])
-                                ->map(fn($id) => \App\Models\Anomalia::find($id)?->etichetta)
+                                ->map(function ($item) {
+                                    if ($item instanceof \App\Models\Anomalia) {
+                                        return $item->etichetta;
+                                    }
+                                    return \App\Models\Anomalia::find((int) $item)?->etichetta;
+                                })
                                 ->filter()
                                 ->implode(', ');
                         @endphp

@@ -126,9 +126,20 @@
                     <td>{{ $pi->presidio->ubicazione }}</td>
                     <td>{{ strtoupper($pi->esito) }}</td>
                     <td>
-                        @foreach($pi->anomalie as $anomalia)
-                            {{ $anomalia->etichetta }}@if(!$loop->last), @endif
-                        @endforeach
+                        @php
+                            $anomaliaItems = $pi->relationLoaded('anomalieItems')
+                                ? $pi->anomalieItems
+                                : $pi->anomalieItems()->with('anomalia')->get();
+                        @endphp
+                        @if($anomaliaItems->isNotEmpty())
+                            @foreach($anomaliaItems as $item)
+                                {{ $item->anomalia?->etichetta ?? '-' }} ({{ $item->riparata ? 'Riparata' : 'Preventivo' }})@if(!$loop->last), @endif
+                            @endforeach
+                        @else
+                            @foreach($pi->anomalie as $anomalia)
+                                {{ $anomalia->etichetta }}@if(!$loop->last), @endif
+                            @endforeach
+                        @endif
                     </td>
                     <td>{{ $pi->note }}</td>
                 </tr>

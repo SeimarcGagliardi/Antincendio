@@ -81,7 +81,7 @@
 
             <div>
                 <label class="block text-sm font-medium text-gray-700">Categoria</label>
-                <select wire:model.defer="nuovoPresidio.categoria" class="w-full border-gray-300 rounded px-2 py-1">
+                <select wire:model="nuovoPresidio.categoria" class="w-full border-gray-300 rounded px-2 py-1">
                     <option value="Estintore">Estintore</option>
                     <option value="Idrante">Idrante</option>
                     <option value="Porta">Porta</option>
@@ -110,6 +110,10 @@
                         <input type="text" list="marca-serbatoio-opzioni" wire:model="nuovoPresidio.marca_serbatoio" wire:change="aggiornaPreviewNuovo" class="w-full border-gray-300 rounded px-2 py-1" placeholder="MB / altro">
                         <button type="button" wire:click="setMarcaMbNuovo" class="px-2 py-1 text-xs rounded border border-gray-300 hover:bg-gray-50">MB</button>
                     </div>
+                    <label class="mt-1 inline-flex items-center gap-2 text-xs text-gray-600">
+                        <input type="checkbox" wire:model="nuovoPresidio.marca_mb" class="border-gray-300">
+                        Flag MB
+                    </label>
                 </div>
 
                 <div>
@@ -149,7 +153,7 @@
             <div>
                 <label class="flex items-center gap-2 text-sm mt-1">
                     <input type="checkbox" wire:model.defer="nuovoPresidio.usa_ritiro" class="border-gray-300">
-                    Usa presidio da ritiri disponibili
+                    Presidio usato
                 </label>
             </div>
     </div>
@@ -242,15 +246,40 @@
                                                 <option value="sostituito">🔁 Sostituito</option>
                                             </select>
                                             @if($pi->usa_ritiro)
-                                                <div class="text-xs mt-1 text-blue-500 font-semibold">Presidio ritirato utilizzato</div>
+                                                <div class="text-xs mt-1 text-blue-500 font-semibold">Presidio usato</div>
                                             @endif
                                         </td>
                                         <td class="p-2">
-                                            <select multiple wire:model="input.{{ $pi->id }}.anomalie" class="w-full border-gray-300 rounded px-2 py-1">
-                                                @foreach(($anomalie[$pi->presidio->categoria] ?? []) as $anomalia)
-                                                    <option value="{{ $anomalia->id }}">{{ $anomalia->etichetta }}</option>
-                                                @endforeach
-                                            </select>
+                                            <div class="space-y-1 max-h-40 overflow-auto border border-gray-200 rounded p-2 bg-white">
+                                                @forelse(($anomalie[$pi->presidio->categoria] ?? []) as $anomalia)
+                                                    @php
+                                                        $sel = in_array((int) $anomalia->id, $input[$pi->id]['anomalie'] ?? [], true);
+                                                        $rip = (bool)($input[$pi->id]['anomalie_riparate'][$anomalia->id] ?? false);
+                                                    @endphp
+                                                    <div class="text-xs">
+                                                        <label class="inline-flex items-center gap-2">
+                                                            <input type="checkbox"
+                                                                   wire:model="input.{{ $pi->id }}.anomalie"
+                                                                   value="{{ $anomalia->id }}"
+                                                                   class="border-gray-300">
+                                                            <span>{{ $anomalia->etichetta }}</span>
+                                                        </label>
+                                                        @if($sel)
+                                                            <label class="ml-5 inline-flex items-center gap-1 text-[11px] text-gray-600">
+                                                                <input type="checkbox"
+                                                                       wire:model="input.{{ $pi->id }}.anomalie_riparate.{{ $anomalia->id }}"
+                                                                       class="border-gray-300">
+                                                                Riparata
+                                                            </label>
+                                                            @if(!$rip)
+                                                                <span class="ml-2 text-[11px] text-amber-700">Preventivo</span>
+                                                            @endif
+                                                        @endif
+                                                    </div>
+                                                @empty
+                                                    <div class="text-xs text-gray-500">Nessuna anomalia configurata per questa categoria.</div>
+                                                @endforelse
+                                            </div>
                                         </td>
                                         <td class="p-2">
                                             @if ($d['sostituito_con'] ?? false)
@@ -274,10 +303,14 @@
                                                                 <input type="text" list="marca-serbatoio-opzioni" wire:model="input.{{ $pi->id }}.nuova_marca_serbatoio" wire:change="aggiornaPreviewSostituzione({{ $pi->id }})" class="w-full border-gray-300 rounded px-2 py-1" placeholder="Marca serbatoio (MB / altro)">
                                                                 <button type="button" wire:click="setMarcaMbSostituzione({{ $pi->id }})" class="px-2 py-1 text-xs rounded border border-gray-300 hover:bg-gray-50">MB</button>
                                                             </div>
+                                                            <label class="inline-flex items-center gap-2 text-xs text-gray-600">
+                                                                <input type="checkbox" wire:model="input.{{ $pi->id }}.nuova_marca_mb" class="border-gray-300">
+                                                                Flag MB
+                                                            </label>
                                                             <input type="date" wire:model="input.{{ $pi->id }}.nuova_data_ultima_revisione" wire:change="aggiornaPreviewSostituzione({{ $pi->id }})" class="w-full border-gray-300 rounded px-2 py-1" placeholder="Ultima revisione">
                                                             <label class="flex gap-1 items-center text-sm">
                                                                 <input type="checkbox" wire:model="input.{{ $pi->id }}.usa_ritiro" class="border-gray-300">
-                                                                Usa presidio da ritiri
+                                                                Presidio usato
                                                             </label>
                                                             @php $prev = $previewSostituzione[$pi->id] ?? null; @endphp
                                                             @if(!empty($prev))
@@ -520,11 +553,36 @@
 
                     <div>
                         <label class="text-sm">Anomalie</label>
-                        <select multiple wire:model="input.{{ $pi->id }}.anomalie" class="w-full text-sm border-gray-300 rounded px-2 py-1">
-                            @foreach(($anomalie[$pi->presidio->categoria] ?? []) as $anomalia)
-                                <option value="{{ $anomalia->id }}">{{ $anomalia->etichetta }}</option>
-                            @endforeach
-                        </select>
+                        <div class="space-y-1 max-h-44 overflow-auto border border-gray-200 rounded p-2 bg-white">
+                            @forelse(($anomalie[$pi->presidio->categoria] ?? []) as $anomalia)
+                                @php
+                                    $sel = in_array((int) $anomalia->id, $input[$pi->id]['anomalie'] ?? [], true);
+                                    $rip = (bool)($input[$pi->id]['anomalie_riparate'][$anomalia->id] ?? false);
+                                @endphp
+                                <div class="text-xs">
+                                    <label class="inline-flex items-center gap-2">
+                                        <input type="checkbox"
+                                               wire:model="input.{{ $pi->id }}.anomalie"
+                                               value="{{ $anomalia->id }}"
+                                               class="border-gray-300">
+                                        <span>{{ $anomalia->etichetta }}</span>
+                                    </label>
+                                    @if($sel)
+                                        <label class="ml-5 inline-flex items-center gap-1 text-[11px] text-gray-600">
+                                            <input type="checkbox"
+                                                   wire:model="input.{{ $pi->id }}.anomalie_riparate.{{ $anomalia->id }}"
+                                                   class="border-gray-300">
+                                            Riparata
+                                        </label>
+                                        @if(!$rip)
+                                            <span class="ml-2 text-[11px] text-amber-700">Preventivo</span>
+                                        @endif
+                                    @endif
+                                </div>
+                            @empty
+                                <div class="text-xs text-gray-500">Nessuna anomalia configurata per questa categoria.</div>
+                            @endforelse
+                        </div>
                     </div>
 
                     <div>
@@ -541,7 +599,7 @@
 
                                 @if ($d['usa_ritiro'] ?? false)
                                     <span class="ml-2 px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">
-                                        Presidio ritirato usato
+                                        Presidio usato
                                     </span>
                                 @endif
                             </div>
@@ -568,6 +626,10 @@
                                             <input type="text" list="marca-serbatoio-opzioni" wire:model="input.{{ $pi->id }}.nuova_marca_serbatoio" wire:change="aggiornaPreviewSostituzione({{ $pi->id }})" class="w-full text-sm border-gray-300 rounded px-2 py-1" placeholder="Marca serbatoio (MB / altro)">
                                             <button type="button" wire:click="setMarcaMbSostituzione({{ $pi->id }})" class="px-2 py-1 text-xs rounded border border-gray-300 hover:bg-gray-50">MB</button>
                                         </div>
+                                        <label class="inline-flex items-center gap-2 text-xs text-gray-600">
+                                            <input type="checkbox" wire:model="input.{{ $pi->id }}.nuova_marca_mb" class="border-gray-300">
+                                            Flag MB
+                                        </label>
                                         <input type="date" wire:model="input.{{ $pi->id }}.nuova_data_ultima_revisione" wire:change="aggiornaPreviewSostituzione({{ $pi->id }})" class="w-full text-sm border-gray-300 rounded px-2 py-1">
                                     @elseif($cat === 'Idrante')
                                         <select wire:model="input.{{ $pi->id }}.nuovo_idrante_tipo_id" class="w-full text-sm border-gray-300 rounded px-2 py-1">
@@ -613,7 +675,7 @@
                                     <div class="mt-2">
                                         <label class="text-sm flex items-center gap-2">
                                             <input type="checkbox" wire:model="input.{{ $pi->id }}.usa_ritiro" class="border-gray-300">
-                                            Usa presidio da ritiri
+                                            Presidio usato
                                         </label>
                                     </div>
                                 @endif
