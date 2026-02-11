@@ -23,13 +23,24 @@ use App\Livewire\Fatturazione\ElencoDaFatturare;
 
 // Redirect utente in base al ruolo
 Route::get('/reindirizzamento', function () {
-    $ruolo = auth()->user()->ruoli()->first()?->nome;
+    $user = auth()->user();
+    if (!$user) {
+        abort(403);
+    }
 
-    return match ($ruolo) {
-        'Admin' => redirect()->route('admin.dashboard'),
-        'Tecnico' => redirect()->route('tecnico.dashboard'),
-        default => abort(403),
-    };
+    if ($user->ruoli()->where('nome', 'Admin')->exists()) {
+        return redirect()->route('admin.dashboard');
+    }
+
+    if ($user->ruoli()->where('nome', 'Amministrazione')->exists()) {
+        return redirect()->route('admin.dashboard');
+    }
+
+    if ($user->ruoli()->where('nome', 'Tecnico')->exists()) {
+        return redirect()->route('tecnico.dashboard');
+    }
+
+    abort(403);
 })->middleware(['auth']);
 
 // Rotte Livewire dashboard

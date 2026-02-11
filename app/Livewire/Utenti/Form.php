@@ -17,7 +17,7 @@ class Form extends Component
     public $name;
     public $email;
     public $password;
-    public $ruolo_id;
+    public array $ruolo_ids = [];
     public $colore_ruolo = '#ff0000';
     public $profile_image;
 
@@ -29,7 +29,11 @@ class Form extends Component
             $this->name = $utente->name;
             $this->email = $utente->email;
             $this->colore_ruolo = $utente->colore_ruolo;
-            $this->ruolo_id = $utente->ruoli()->first()?->id;
+            $this->ruolo_ids = $utente->ruoli()
+                ->pluck('ruoli.id')
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
         }
     }
 
@@ -39,10 +43,18 @@ class Form extends Component
             'name' => 'required|string',
             'email' => 'required|email|unique:users,email,' . $this->utenteId,
             'password' => $this->utenteId ? 'nullable|min:6' : 'required|min:6',
-            'ruolo_id' => 'required|exists:ruoli,id',
+            'ruolo_ids' => 'required|array|min:1',
+            'ruolo_ids.*' => 'required|exists:ruoli,id',
             'colore_ruolo' => 'required|string',
             'profile_image' => 'nullable|image|max:1024',
         ]);
+
+        $ruoli = collect($this->ruolo_ids)
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
 
         $utente = User::updateOrCreate(
             ['id' => $this->utenteId],
@@ -59,7 +71,7 @@ class Form extends Component
             $utente->update(['profile_image' => $path]);
         }
 
-        $utente->ruoli()->sync([$this->ruolo_id]);
+        $utente->ruoli()->sync($ruoli);
 
         return redirect()->route('utenti.index');
     }
@@ -67,7 +79,7 @@ class Form extends Component
     public function render()
     {
         return view('livewire.utenti.form', [
-            'ruoli' => Ruolo::all(),
+            'ruoli' => Ruolo::orderBy('nome')->get(),
         ])->layout('layouts.app');
     }
 }

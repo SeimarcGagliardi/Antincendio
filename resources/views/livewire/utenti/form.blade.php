@@ -23,14 +23,20 @@
         </div>
 
         <div>
-            <label>Ruolo</label>
-            <select wire:model="ruolo_id" class="select select-bordered w-full">
-                <option value="">-- seleziona --</option>
+            <label>Ruoli</label>
+            <div class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 border rounded p-3 bg-gray-50">
                 @foreach ($ruoli as $ruolo)
-                    <option value="{{ $ruolo->id }}">{{ $ruolo->nome }}</option>
+                    <label class="inline-flex items-center gap-2 text-sm">
+                        <input type="checkbox"
+                               wire:model.live="ruolo_ids"
+                               value="{{ $ruolo->id }}"
+                               class="rounded border-gray-300">
+                        <span>{{ $ruolo->nome }}</span>
+                    </label>
                 @endforeach
-            </select>
-            @error('ruolo_id') <span class="text-sm text-red-500">{{ $message }}</span> @enderror
+            </div>
+            @error('ruolo_ids') <span class="text-sm text-red-500">{{ $message }}</span> @enderror
+            @error('ruolo_ids.*') <span class="text-sm text-red-500">{{ $message }}</span> @enderror
         </div>
 
         <div>
