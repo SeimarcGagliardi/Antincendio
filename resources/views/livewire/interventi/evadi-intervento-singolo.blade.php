@@ -328,6 +328,11 @@
                                                     <span><strong>Tipo Estintore:</strong> {{ $pi->presidio->tipoEstintore?->sigla }} – {{ $pi->presidio->tipoEstintore?->descrizione }}</span>
                                                 @elseif($cat === 'Idrante')
                                                     <span><strong>Tipo Idrante:</strong> {{ $pi->presidio->idranteTipoRef?->nome ?? $pi->presidio->idrante_tipo ?? '—' }}</span>
+                                                    @if($showControlloAnnualeIdranti)
+                                                        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-orange-100 text-orange-700">
+                                                            CONTROLLO ANNUALE
+                                                        </span>
+                                                    @endif
                                                 @elseif($cat === 'Porta')
                                                     <span><strong>Tipo Porta:</strong> {{ $pi->presidio->portaTipoRef?->nome ?? $pi->presidio->porta_tipo ?? '—' }}</span>
                                                 @else
@@ -485,6 +490,11 @@
                             <strong>Tipo Estintore:</strong> {{ $pi->presidio->tipoEstintore?->sigla }} – {{ $pi->presidio->tipoEstintore?->descrizione }}
                         @elseif($cat === 'Idrante')
                             <strong>Tipo Idrante:</strong> {{ $pi->presidio->idranteTipoRef?->nome ?? $pi->presidio->idrante_tipo ?? '—' }}
+                            @if($showControlloAnnualeIdranti)
+                                <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-orange-100 text-orange-700">
+                                    CONTROLLO ANNUALE
+                                </span>
+                            @endif
                         @elseif($cat === 'Porta')
                             <strong>Tipo Porta:</strong> {{ $pi->presidio->portaTipoRef?->nome ?? $pi->presidio->porta_tipo ?? '—' }}
                         @else

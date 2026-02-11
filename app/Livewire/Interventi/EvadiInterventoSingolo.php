@@ -38,6 +38,7 @@ class EvadiInterventoSingolo extends Component
     public array $tipiPorte = [];
     public array $editMode = [];
     public array $editPresidio = [];
+    public bool $showControlloAnnualeIdranti = false;
 
     #[On('firmaClienteAcquisita')]
     public function salvaFirmaCliente($data)
@@ -165,6 +166,7 @@ public function salvaNuovoPresidio()
     {
         $this->intervento = $intervento->load('cliente', 'sede', 'tecnici', 'presidiIntervento.presidio.tipoEstintore.colore', 'presidiIntervento.presidio.idranteTipoRef', 'presidiIntervento.presidio.portaTipoRef');
         $this->durataEffettiva = $this->intervento->durata_effettiva;
+        $this->showControlloAnnualeIdranti = $this->isMeseMinutaggioPiuAlto();
         $this->marcaSuggestions = $this->caricaMarcheSuggerite();
         $this->tipiIdranti = TipoPresidio::where('categoria', 'Idrante')->orderBy('nome')->pluck('nome', 'id')->all();
         $this->tipiPorte = TipoPresidio::where('categoria', 'Porta')->orderBy('nome')->pluck('nome', 'id')->all();
@@ -731,6 +733,62 @@ public function salvaNuovoPresidio()
     {
         $marca = trim((string) $marca);
         return $marca === '' ? null : mb_strtoupper($marca);
+    }
+
+    private function isMeseMinutaggioPiuAlto(): bool
+    {
+        if (!$this->intervento?->data_intervento) {
+            return false;
+        }
+
+        $meseIntervento = (int) Carbon::parse($this->intervento->data_intervento)->month;
+        $sede = $this->intervento->sede;
+
+        if ($sede && $this->hasMesePiuAlto($sede, $meseIntervento)) {
+            return true;
+        }
+
+        $cliente = $this->intervento->cliente;
+        if ($cliente && $this->hasMesePiuAlto($cliente, $meseIntervento)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private function hasMesePiuAlto($entity, int $meseIntervento): bool
+    {
+        $mesiVisita = $this->normalizzaMesiVisita($entity->mesi_visita ?? []);
+        if (count($mesiVisita) < 2 || !in_array($meseIntervento, $mesiVisita, true)) {
+            return false;
+        }
+
+        $corrente = (int) ($entity->minutiPerMese($meseIntervento) ?? 0);
+        $altroMese = collect($mesiVisita)->first(fn ($m) => (int) $m !== $meseIntervento);
+        $altro = (int) ($entity->minutiPerMese((int) $altroMese) ?? 0);
+
+        return $corrente > $altro;
+    }
+
+    private function normalizzaMesiVisita($raw): array
+    {
+        $map = ['gen'=>1,'feb'=>2,'mar'=>3,'apr'=>4,'mag'=>5,'giu'=>6,'lug'=>7,'ago'=>8,'set'=>9,'ott'=>10,'nov'=>11,'dic'=>12];
+        $out = [];
+
+        if (is_array($raw) && array_values($raw) === $raw) {
+            foreach ($raw as $v) {
+                $out[] = is_numeric($v) ? (int) $v : ($map[mb_strtolower((string) $v)] ?? null);
+            }
+        } elseif (is_array($raw)) {
+            foreach ($raw as $k => $v) {
+                if (!$v) continue;
+                $out[] = is_numeric($k) ? (int) $k : ($map[mb_strtolower((string) $k)] ?? null);
+            }
+        }
+
+        $out = array_values(array_filter(array_unique($out), fn ($m) => $m >= 1 && $m <= 12));
+        sort($out);
+        return array_slice($out, 0, 2);
     }
 
 

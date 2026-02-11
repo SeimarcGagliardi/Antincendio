@@ -53,14 +53,14 @@ class EvadiInterventi extends Component
         return redirect()->route('interventi.evadi.dettaglio', ['intervento' => $id]);
     }
 
-    public function updatedNoteByIntervento($value, $key): void
+    public function salvaNoteIntervento(int $id): void
     {
-        $id = (int) $key;
         if (!$id) return;
         $intervento = Intervento::find($id);
         if (!$intervento) return;
-        $intervento->note = $value;
+        $intervento->note = $this->noteByIntervento[$id] ?? null;
         $intervento->save();
+        $this->dispatch('toast', type: 'success', message: 'Note intervento salvate');
     }
 
     public function render()
