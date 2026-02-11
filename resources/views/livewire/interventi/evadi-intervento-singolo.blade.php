@@ -814,6 +814,44 @@
             </button>
         </div>
 
+        <div>
+            <div class="text-sm font-semibold mb-1">Riepilogo presidi intervento (senza prezzi)</div>
+            <div class="overflow-auto border rounded">
+                <table class="min-w-full text-xs">
+                    <thead class="bg-gray-100 text-gray-600">
+                        <tr>
+                            <th class="p-2 text-left">Cod. Art.</th>
+                            <th class="p-2 text-left">Descrizione</th>
+                            <th class="p-2 text-right">Q.tà</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse(($riepilogoOrdine['righe_intervento'] ?? []) as $riga)
+                            <tr class="border-t">
+                                <td class="p-2 font-mono">{{ $riga['codice_articolo'] }}</td>
+                                <td class="p-2">{{ $riga['descrizione'] ?: '—' }}</td>
+                                <td class="p-2 text-right">{{ number_format((float)$riga['quantita'], 2, ',', '.') }}</td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="3" class="p-2 text-gray-500">Nessun presidio nel riepilogo.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+            <div class="text-[11px] text-gray-500 mt-1">I prezzi vengono letti solo dall'ordine Business.</div>
+        </div>
+
+        @if(!empty($senzaCodice))
+            <div class="rounded border border-amber-300 bg-amber-50 p-3 text-xs">
+                <div class="font-semibold text-amber-800 mb-1">Presidi senza codice articolo di fatturazione</div>
+                <div class="space-y-1">
+                    @foreach($senzaCodice as $row)
+                        <div>{{ $row['categoria'] }} #{{ $row['progressivo'] }} — {{ $row['tipo'] }}</div>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+
         @if(!($ordinePreventivo['found'] ?? false))
             <div class="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
                 {{ $ordinePreventivo['error'] ?? 'Ordine preventivo non trovato.' }}
@@ -839,73 +877,35 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                <div>
-                    <div class="text-sm font-semibold mb-1">Righe ordine (Business)</div>
-                    <div class="overflow-auto border rounded">
-                        <table class="min-w-full text-xs">
-                            <thead class="bg-gray-100 text-gray-600">
-                                <tr>
-                                    <th class="p-2 text-left">Cod. Art.</th>
-                                    <th class="p-2 text-left">Descrizione</th>
-                                    <th class="p-2 text-right">Q.tà</th>
-                                    <th class="p-2 text-right">Prezzo</th>
-                                    <th class="p-2 text-right">Importo</th>
+            <div>
+                <div class="text-sm font-semibold mb-1">Righe ordine (Business)</div>
+                <div class="overflow-auto border rounded">
+                    <table class="min-w-full text-xs">
+                        <thead class="bg-gray-100 text-gray-600">
+                            <tr>
+                                <th class="p-2 text-left">Cod. Art.</th>
+                                <th class="p-2 text-left">Descrizione</th>
+                                <th class="p-2 text-right">Q.tà</th>
+                                <th class="p-2 text-right">Prezzo</th>
+                                <th class="p-2 text-right">Importo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse(($ordinePreventivo['rows'] ?? []) as $riga)
+                                <tr class="border-t">
+                                    <td class="p-2 font-mono">{{ $riga['codice_articolo'] }}</td>
+                                    <td class="p-2">{{ $riga['descrizione'] ?: '—' }}</td>
+                                    <td class="p-2 text-right">{{ number_format((float)$riga['quantita'], 2, ',', '.') }}</td>
+                                    <td class="p-2 text-right">€ {{ number_format((float)$riga['prezzo_unitario'], 2, ',', '.') }}</td>
+                                    <td class="p-2 text-right">€ {{ number_format((float)$riga['importo'], 2, ',', '.') }}</td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                @forelse(($ordinePreventivo['rows'] ?? []) as $riga)
-                                    <tr class="border-t">
-                                        <td class="p-2 font-mono">{{ $riga['codice_articolo'] }}</td>
-                                        <td class="p-2">{{ $riga['descrizione'] ?: '—' }}</td>
-                                        <td class="p-2 text-right">{{ number_format((float)$riga['quantita'], 2, ',', '.') }}</td>
-                                        <td class="p-2 text-right">€ {{ number_format((float)$riga['prezzo_unitario'], 2, ',', '.') }}</td>
-                                        <td class="p-2 text-right">€ {{ number_format((float)$riga['importo'], 2, ',', '.') }}</td>
-                                    </tr>
-                                @empty
-                                    <tr><td colspan="5" class="p-2 text-gray-500">Nessuna riga ordine.</td></tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                <div>
-                    <div class="text-sm font-semibold mb-1">Righe intervento (confronto)</div>
-                    <div class="overflow-auto border rounded">
-                        <table class="min-w-full text-xs">
-                            <thead class="bg-gray-100 text-gray-600">
-                                <tr>
-                                    <th class="p-2 text-left">Cod. Art.</th>
-                                    <th class="p-2 text-left">Descrizione</th>
-                                    <th class="p-2 text-right">Q.tà</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @forelse(($riepilogoOrdine['righe_intervento'] ?? []) as $riga)
-                                    <tr class="border-t">
-                                        <td class="p-2 font-mono">{{ $riga['codice_articolo'] }}</td>
-                                        <td class="p-2">{{ $riga['descrizione'] ?: '—' }}</td>
-                                        <td class="p-2 text-right">{{ number_format((float)$riga['quantita'], 2, ',', '.') }}</td>
-                                    </tr>
-                                @empty
-                                    <tr><td colspan="3" class="p-2 text-gray-500">Nessuna riga intervento.</td></tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
+                            @empty
+                                <tr><td colspan="5" class="p-2 text-gray-500">Nessuna riga ordine.</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
                 </div>
             </div>
-
-            @if(!empty($senzaCodice))
-                <div class="rounded border border-amber-300 bg-amber-50 p-3 text-xs">
-                    <div class="font-semibold text-amber-800 mb-1">Presidi senza codice articolo di fatturazione</div>
-                    <div class="space-y-1">
-                        @foreach($senzaCodice as $row)
-                            <div>{{ $row['categoria'] }} #{{ $row['progressivo'] }} — {{ $row['tipo'] }}</div>
-                        @endforeach
-                    </div>
-                </div>
-            @endif
 
             @if($confrontoOrdine['ok'] ?? false)
                 <div class="rounded border border-green-300 bg-green-50 p-3 text-sm text-green-700">

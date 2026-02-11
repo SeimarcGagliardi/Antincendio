@@ -151,6 +151,51 @@
     </table>
 
     <h2>Confronto Ordine Preventivo</h2>
+    <h2>Riepilogo Presidi Intervento (Senza Prezzi)</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Cod. Art.</th>
+                <th>Descrizione</th>
+                <th>Q.tà</th>
+            </tr>
+        </thead>
+        <tbody>
+            @forelse(($righeIntervento['rows'] ?? []) as $row)
+                <tr>
+                    <td>{{ $row['codice_articolo'] }}</td>
+                    <td>{{ $row['descrizione'] ?: '-' }}</td>
+                    <td>{{ number_format((float)$row['quantita'], 2, ',', '.') }}</td>
+                </tr>
+            @empty
+                <tr><td colspan="3">Nessun presidio nel riepilogo.</td></tr>
+            @endforelse
+        </tbody>
+    </table>
+    <div class="note">I prezzi vengono letti solo dall'ordine Business.</div>
+
+    @if(!empty($righeIntervento['missing_mapping'] ?? []))
+        <h2>Presidi Senza Codice Articolo</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Categoria</th>
+                    <th>Progressivo</th>
+                    <th>Tipo</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach(($righeIntervento['missing_mapping'] ?? []) as $row)
+                    <tr>
+                        <td>{{ $row['categoria'] }}</td>
+                        <td>{{ $row['progressivo'] }}</td>
+                        <td>{{ $row['tipo'] }}</td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    @endif
+
     @if(!($ordinePreventivo['found'] ?? false))
         <div class="note">
             {{ $ordinePreventivo['error'] ?? 'Ordine preventivo non trovato.' }}
@@ -189,50 +234,6 @@
                 @endforelse
             </tbody>
         </table>
-
-        <h2>Righe Intervento (Confronto)</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>Cod. Art.</th>
-                    <th>Descrizione</th>
-                    <th>Q.tà</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse(($righeIntervento['rows'] ?? []) as $row)
-                    <tr>
-                        <td>{{ $row['codice_articolo'] }}</td>
-                        <td>{{ $row['descrizione'] ?: '-' }}</td>
-                        <td>{{ number_format((float)$row['quantita'], 2, ',', '.') }}</td>
-                    </tr>
-                @empty
-                    <tr><td colspan="3">Nessuna riga intervento.</td></tr>
-                @endforelse
-            </tbody>
-        </table>
-
-        @if(!empty($righeIntervento['missing_mapping'] ?? []))
-            <h2>Presidi Senza Codice Articolo</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Categoria</th>
-                        <th>Progressivo</th>
-                        <th>Tipo</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach(($righeIntervento['missing_mapping'] ?? []) as $row)
-                        <tr>
-                            <td>{{ $row['categoria'] }}</td>
-                            <td>{{ $row['progressivo'] }}</td>
-                            <td>{{ $row['tipo'] }}</td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        @endif
 
         @if($confrontoOrdine['ok'] ?? false)
             <div class="note"><strong>Esito confronto:</strong> Nessuna differenza tra ordine e intervento.</div>
