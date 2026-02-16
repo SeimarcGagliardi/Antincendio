@@ -32,10 +32,11 @@
                     </a>
                     @auth
                         @if(auth()->user()->ruoli()->where('nome','Admin')->exists())
-                            <button x-data @click="$dispatch('open-admin-settings')"
-                                    class="p-2 rounded hover:bg-gray-100" title="Impostazioni">
-                            <i class="fa fa-gear text-gray-600"></i>
-                            </button>
+                            <a href="{{ route('admin.impostazioni') }}"
+                               class="inline-flex items-center p-2 rounded hover:bg-red-700/50"
+                               title="Impostazioni">
+                                <i class="fa fa-gear text-white"></i>
+                            </a>
                         @endif
                     @endauth
 
@@ -96,12 +97,6 @@
 
 
 <!-- /Toast ---------------------------------------------------------------->
-        @auth
-        @if(auth()->user()->ruoli()->where('nome','Admin')->exists())
-            @include('admin.partials.settings-modal')
-        @endif
-        @endauth
-
     @livewireScripts
     @stack('scripts')
     </body>
