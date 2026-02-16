@@ -1,6 +1,18 @@
 @extends('layouts.app')
 
 @section('content')
+@php
+  $tabs = [
+    'colori' => ['label' => 'Colori Estintori', 'icon' => 'fa-palette'],
+    'tipi-presidio' => ['label' => 'Tipi Idranti/Porte', 'icon' => 'fa-list'],
+    'anomalie-prezzi' => ['label' => 'Prezzi Anomalie', 'icon' => 'fa-exclamation-triangle'],
+    'utenti' => ['label' => 'Gestione Utenti', 'icon' => 'fa-users'],
+  ];
+  $tab = request()->query('tab', 'colori');
+  if (!array_key_exists($tab, $tabs)) {
+    $tab = 'colori';
+  }
+@endphp
 <div class="max-w-6xl mx-auto bg-white shadow rounded-lg">
   <div class="flex items-center justify-between px-4 py-3 border-b">
     <h1 class="text-xl font-semibold">Impostazioni tecniche</h1>
@@ -9,43 +21,26 @@
     </a>
   </div>
 
-  <div x-data="{ tab: 'colori' }" class="flex">
+  <div class="flex">
     <aside class="w-56 border-r p-4 space-y-2">
-      <button class="w-full text-left px-3 py-2 rounded"
-              :class="tab==='colori' ? 'bg-red-600 text-white' : 'hover:bg-gray-100'"
-              @click="tab='colori'">
-        <i class="fa fa-palette mr-1"></i> Colori Estintori
-      </button>
-      <button class="w-full text-left px-3 py-2 rounded"
-              :class="tab==='tipi-presidio' ? 'bg-red-600 text-white' : 'hover:bg-gray-100'"
-              @click="tab='tipi-presidio'">
-        <i class="fa fa-list mr-1"></i> Tipi Idranti/Porte
-      </button>
-      <button class="w-full text-left px-3 py-2 rounded"
-              :class="tab==='anomalie-prezzi' ? 'bg-red-600 text-white' : 'hover:bg-gray-100'"
-              @click="tab='anomalie-prezzi'">
-        <i class="fa fa-exclamation-triangle mr-1"></i> Prezzi Anomalie
-      </button>
-      <button class="w-full text-left px-3 py-2 rounded"
-              :class="tab==='utenti' ? 'bg-red-600 text-white' : 'hover:bg-gray-100'"
-              @click="tab='utenti'">
-        <i class="fa fa-users mr-1"></i> Gestione Utenti
-      </button>
+      @foreach($tabs as $key => $cfg)
+        <a href="{{ route('admin.impostazioni', ['tab' => $key]) }}"
+           class="block w-full text-left px-3 py-2 rounded {{ $tab === $key ? 'bg-red-600 text-white' : 'hover:bg-gray-100 text-gray-800' }}">
+          <i class="fa {{ $cfg['icon'] }} mr-1"></i> {{ $cfg['label'] }}
+        </a>
+      @endforeach
     </aside>
 
     <main class="flex-1 p-4">
-      <div x-show="tab==='colori'">
-        @livewire('tipi-estintori.imposta-colore')
-      </div>
-      <div x-show="tab==='tipi-presidio'">
-        @livewire('tipi-presidio.gestione-tipi')
-      </div>
-      <div x-show="tab==='anomalie-prezzi'">
-        @livewire('anomalie.imposta-prezzi')
-      </div>
-      <div x-show="tab==='utenti'">
-        @livewire('utenti.index')
-      </div>
+      @if($tab === 'colori')
+        @livewire('tipi-estintori.imposta-colore', [], key('settings-colori-page'))
+      @elseif($tab === 'tipi-presidio')
+        @livewire('tipi-presidio.gestione-tipi', [], key('settings-tipi-presidio-page'))
+      @elseif($tab === 'anomalie-prezzi')
+        @livewire('anomalie.imposta-prezzi', [], key('settings-anomalie-prezzi-page'))
+      @elseif($tab === 'utenti')
+        @livewire('utenti.index', [], key('settings-utenti-page'))
+      @endif
     </main>
   </div>
 </div>
