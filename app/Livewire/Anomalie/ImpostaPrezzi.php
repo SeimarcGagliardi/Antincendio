@@ -12,6 +12,7 @@ class ImpostaPrezzi extends Component
     public bool $hasPrezzoColumn = false;
     public array $prezzi = [];
     public array $attive = [];
+    public array $invalidPrezzi = [];
 
     public function mount(): void
     {
@@ -36,6 +37,11 @@ class ImpostaPrezzi extends Component
 
     public function salvaRiga(int $anomaliaId): void
     {
+        if (!$this->hasPrezzoColumn) {
+            $this->dispatch('toast', type: 'error', message: 'Colonna prezzo non trovata. Esegui le migration.');
+            return;
+        }
+
         if (!$this->persistAnomalia($anomaliaId)) {
             $this->dispatch('toast', type: 'error', message: 'Valore prezzo non valido.');
             return;
@@ -46,6 +52,11 @@ class ImpostaPrezzi extends Component
 
     public function salvaTutti(): void
     {
+        if (!$this->hasPrezzoColumn) {
+            $this->dispatch('toast', type: 'error', message: 'Colonna prezzo non trovata. Esegui le migration.');
+            return;
+        }
+
         $invalidi = [];
         $ids = Anomalia::query()->pluck('id')->all();
 
@@ -88,6 +99,8 @@ class ImpostaPrezzi extends Component
 
     private function caricaStato(): void
     {
+        $this->invalidPrezzi = [];
+
         $query = Anomalia::query()->select(['id', 'attiva']);
         if ($this->hasPrezzoColumn) {
             $query->addSelect('prezzo');
@@ -114,8 +127,10 @@ class ImpostaPrezzi extends Component
         if ($this->hasPrezzoColumn) {
             $parsedPrezzo = $this->parsePrezzo($this->prezzi[$anomaliaId] ?? null);
             if ($parsedPrezzo === null) {
+                $this->invalidPrezzi[$anomaliaId] = true;
                 return false;
             }
+            unset($this->invalidPrezzi[$anomaliaId]);
             $payload['prezzo'] = $parsedPrezzo;
         }
 
