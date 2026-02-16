@@ -22,6 +22,11 @@
         <i class="fa fa-list mr-1"></i> Tipi Idranti/Porte
       </button>
       <button class="w-full text-left px-3 py-2 rounded"
+              :class="tab==='anomalie-prezzi' ? 'bg-red-600 text-white' : 'hover:bg-gray-100'"
+              @click="tab='anomalie-prezzi'">
+        <i class="fa fa-exclamation-triangle mr-1"></i> Prezzi Anomalie
+      </button>
+      <button class="w-full text-left px-3 py-2 rounded"
               :class="tab==='utenti' ? 'bg-red-600 text-white' : 'hover:bg-gray-100'"
               @click="tab='utenti'">
         <i class="fa fa-users mr-1"></i> Gestione Utenti
@@ -34,6 +39,9 @@
       </div>
       <div x-show="tab==='tipi-presidio'">
         @livewire('tipi-presidio.gestione-tipi')
+      </div>
+      <div x-show="tab==='anomalie-prezzi'">
+        @livewire('anomalie.imposta-prezzi')
       </div>
       <div x-show="tab==='utenti'">
         @livewire('utenti.index')
