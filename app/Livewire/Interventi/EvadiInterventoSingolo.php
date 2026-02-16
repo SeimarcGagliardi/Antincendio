@@ -13,6 +13,7 @@ use App\Models\InterventoTecnico;
 use App\Models\InterventoTecnicoSessione;
 use App\Models\MailQueueItem;
 use App\Models\TipoPresidio;
+use App\Services\Clienti\BusinessFormaPagamentoService;
 use App\Services\Interventi\OrdinePreventivoService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Schema;
@@ -256,11 +257,8 @@ public function salvaNuovoPresidio()
             ...$this->interventoRelations()
         );
         $this->durataEffettiva = (int) ($this->intervento->durata_effettiva ?? 0);
-        $this->richiedePagamentoManutentore = (bool) ($this->intervento->cliente?->richiede_pagamento_manutentore ?? false);
-        $this->formaPagamentoDescrizione = trim((string) ($this->intervento->cliente?->forma_pagamento_descrizione ?? ''));
-        if ($this->formaPagamentoDescrizione === '') {
-            $this->formaPagamentoDescrizione = null;
-        }
+        $this->refreshFormaPagamentoFromBusiness(false);
+        $this->hydrateFormaPagamentoFromCliente();
         $this->pagamentoMetodo = $this->normalizePagamentoMetodo($this->intervento->pagamento_metodo);
         $this->pagamentoImporto = $this->intervento->pagamento_importo !== null
             ? number_format((float) $this->intervento->pagamento_importo, 2, '.', '')
@@ -1422,6 +1420,21 @@ public function salvaNuovoPresidio()
         }
     }
 
+    public function ricaricaFormaPagamentoBusiness(): void
+    {
+        $ok = $this->refreshFormaPagamentoFromBusiness(true);
+        $this->hydrateFormaPagamentoFromCliente();
+
+        if ($ok) {
+            $this->messaggioSuccesso = 'Forma pagamento aggiornata da Business.';
+            return;
+        }
+
+        if (!$this->messaggioErrore) {
+            $this->messaggioErrore = 'Impossibile aggiornare la forma pagamento da Business.';
+        }
+    }
+
     public function getRiepilogoOrdineProperty(): array
     {
         $svc = $this->ordineService();
@@ -1800,6 +1813,63 @@ public function salvaNuovoPresidio()
         }
 
         return $out;
+    }
+
+    private function hydrateFormaPagamentoFromCliente(): void
+    {
+        $cliente = $this->intervento->cliente;
+
+        $this->richiedePagamentoManutentore = (bool) ($cliente?->richiede_pagamento_manutentore ?? false);
+        $this->formaPagamentoDescrizione = trim((string) ($cliente?->forma_pagamento_descrizione ?? ''));
+        if ($this->formaPagamentoDescrizione === '') {
+            $this->formaPagamentoDescrizione = null;
+        }
+
+        if ($this->formaPagamentoDescrizione === null && $this->richiedePagamentoManutentore) {
+            $this->formaPagamentoDescrizione = 'ALLA CONSEGNA';
+        }
+    }
+
+    private function refreshFormaPagamentoFromBusiness(bool $notifyError): bool
+    {
+        $cliente = $this->intervento->cliente;
+        if (!$cliente) {
+            return false;
+        }
+
+        if (!Schema::hasColumn('clienti', 'forma_pagamento_codice')
+            || !Schema::hasColumn('clienti', 'forma_pagamento_descrizione')
+            || !Schema::hasColumn('clienti', 'richiede_pagamento_manutentore')
+        ) {
+            return false;
+        }
+
+        $svc = app(BusinessFormaPagamentoService::class);
+        $result = $svc->leggiPerConto((string) ($cliente->codice_esterno ?? ''));
+        if (!($result['found'] ?? false)) {
+            if ($notifyError && !empty($result['error'])) {
+                $this->messaggioErrore = 'Business pagamento: ' . $result['error'];
+            }
+            return false;
+        }
+
+        $newCode = $result['forma_pagamento_codice'] ?? null;
+        $newDesc = $result['forma_pagamento_descrizione'] ?? null;
+        $newRequires = (bool) ($result['richiede_pagamento_manutentore'] ?? false);
+
+        $updates = [
+            'forma_pagamento_codice' => $newCode,
+            'forma_pagamento_descrizione' => $newDesc,
+            'richiede_pagamento_manutentore' => $newRequires,
+        ];
+
+        $cliente->fill($updates);
+        if ($cliente->isDirty(array_keys($updates))) {
+            $cliente->save();
+            $this->intervento->setRelation('cliente', $cliente->fresh());
+        }
+
+        return true;
     }
 
     private function persistPrezziExtraManuali(): void

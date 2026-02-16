@@ -23,7 +23,14 @@
     </div>
 
     <div class="bg-white border-2 border-red-200 rounded p-3 shadow-sm text-sm text-gray-800">
-        <div class="font-extrabold tracking-wide">FORMA PAGAMENTO BUSINESS</div>
+        <div class="flex items-center justify-between gap-2">
+            <div class="font-extrabold tracking-wide">FORMA PAGAMENTO BUSINESS</div>
+            <button wire:click="ricaricaFormaPagamentoBusiness"
+                    type="button"
+                    class="px-2 py-1 rounded border border-gray-300 text-xs font-semibold text-gray-700 hover:bg-gray-100">
+                Ricarica da Business
+            </button>
+        </div>
         @if($richiedePagamentoManutentore)
             <div class="mt-1 text-sm font-bold text-red-700">
                 ALLA CONSEGNA (cod. 40): incasso da manutentore obbligatorio

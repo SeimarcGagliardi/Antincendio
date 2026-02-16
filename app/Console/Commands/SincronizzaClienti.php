@@ -12,7 +12,7 @@ class SincronizzaClienti extends Command
 {
     protected $signature = 'sincronizza:clienti {--lookback=1 : Giorni di retrodatazione per sicurezza}';
     protected $description = 'Sincronizza clienti e sedi da MSSQL a MySQL (basata su codice_esterno)';
-    private ?bool $tabpagaJoinAvailable = null;
+    private ?array $tabPagaColumns = null;
 
     public function handle()
     {
@@ -173,10 +173,14 @@ class SincronizzaClienti extends Command
             ->where('a.an_tipo', 'C')
             ->select('a.*');
 
-        if ($anagraCodPagaCol && $this->canJoinTabPaga()) {
-            $query->leftJoin('tabpaga as tp', "tp.tb_codpaga", '=', "a.{$anagraCodPagaCol}")
-                ->addSelect(DB::raw("a.{$anagraCodPagaCol} as an_codpaga_sync"))
-                ->addSelect(DB::raw('tp.tb_despaga as tb_despaga_sync'));
+        $tabPagaCols = $this->resolveTabPagaColumns();
+        if ($anagraCodPagaCol && !empty($tabPagaCols['code'])) {
+            $query->leftJoin('tabpaga as tp', "tp.{$tabPagaCols['code']}", '=', "a.{$anagraCodPagaCol}")
+                ->addSelect(DB::raw("a.{$anagraCodPagaCol} as an_codpaga_sync"));
+
+            if (!empty($tabPagaCols['desc'])) {
+                $query->addSelect(DB::raw("tp.{$tabPagaCols['desc']} as tb_despaga_sync"));
+            }
         }
 
         return $query;
@@ -197,19 +201,22 @@ class SincronizzaClienti extends Command
         // NB: non includere "note" qui: le note anagrafica gestite nel gestionale
         // non devono essere sovrascritte dalla sincronizzazione Business.
 
-        $hasPaymentColumns = property_exists($c, 'an_codpaga_sync')
-            || property_exists($c, 'an_codpaga')
-            || property_exists($c, 'an_codpag')
-            || property_exists($c, 'tb_despaga_sync');
+        $formaCodice = $this->normalizePaymentCode($c);
+        $formaDescrizione = trim((string) ($this->readObjectValue($c, [
+            'tb_despaga_sync',
+            'tb_despaga',
+            'tb_despag',
+        ]) ?? ''));
+        if ($formaDescrizione === '') {
+            $formaDescrizione = null;
+        }
 
-        if (!$hasPaymentColumns) {
+        if ($formaCodice === null && $formaDescrizione === null) {
             return $payload;
         }
 
-        $formaCodice = $this->normalizePaymentCode($c);
-        $formaDescrizione = trim((string) ($c->tb_despaga_sync ?? ''));
-        if ($formaDescrizione === '') {
-            $formaDescrizione = null;
+        if ($formaDescrizione === null && $formaCodice === 40) {
+            $formaDescrizione = 'ALLA CONSEGNA';
         }
 
         $payload['forma_pagamento_codice'] = $formaCodice;
@@ -221,7 +228,11 @@ class SincronizzaClienti extends Command
 
     private function normalizePaymentCode(object $c): ?int
     {
-        $candidate = $c->an_codpaga_sync ?? $c->an_codpaga ?? $c->an_codpag ?? null;
+        $candidate = $this->readObjectValue($c, [
+            'an_codpaga_sync',
+            'an_codpaga',
+            'an_codpag',
+        ]);
         return is_numeric($candidate) ? (int) $candidate : null;
     }
 
@@ -247,26 +258,48 @@ class SincronizzaClienti extends Command
         return null;
     }
 
-    private function canJoinTabPaga(): bool
+    private function resolveTabPagaColumns(): array
     {
-        if ($this->tabpagaJoinAvailable !== null) {
-            return $this->tabpagaJoinAvailable;
+        if ($this->tabPagaColumns !== null) {
+            return $this->tabPagaColumns;
         }
 
         try {
             $columns = DB::connection('sqlsrv')->getSchemaBuilder()->getColumnListing('tabpaga');
         } catch (\Throwable $e) {
-            $this->tabpagaJoinAvailable = false;
-            return false;
+            $this->tabPagaColumns = ['code' => null, 'desc' => null];
+            return $this->tabPagaColumns;
         }
 
         $columnMap = [];
         foreach ($columns as $col) {
-            $columnMap[strtolower($col)] = true;
+            $columnMap[strtolower($col)] = $col;
         }
 
-        $this->tabpagaJoinAvailable = isset($columnMap['tb_codpaga']);
-        return $this->tabpagaJoinAvailable;
+        $this->tabPagaColumns = [
+            'code' => $columnMap['tb_codpaga'] ?? $columnMap['tb_codpag'] ?? null,
+            'desc' => $columnMap['tb_despaga'] ?? $columnMap['tb_despag'] ?? null,
+        ];
+
+        return $this->tabPagaColumns;
+    }
+
+    private function readObjectValue(object $row, array $candidates)
+    {
+        $raw = (array) $row;
+        $map = [];
+        foreach ($raw as $key => $value) {
+            $map[mb_strtolower((string) $key)] = $value;
+        }
+
+        foreach ($candidates as $candidate) {
+            $key = mb_strtolower((string) $candidate);
+            if (array_key_exists($key, $map)) {
+                return $map[$key];
+            }
+        }
+
+        return null;
     }
 
     private function resolveDestdivUltaggColumn(): ?string
