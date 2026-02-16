@@ -59,6 +59,7 @@ class EvadiInterventoSingolo extends Component
         'header' => null,
         'rows' => [],
     ];
+    public array $prezziExtraManuali = [];
 
     #[On('firmaClienteAcquisita')]
     public function salvaFirmaCliente($payload = null): void
@@ -330,6 +331,7 @@ public function salvaNuovoPresidio()
             ];
         }
 
+        $this->prezziExtraManuali = $this->loadPrezziExtraManualiFromPayload();
         $this->caricaOrdinePreventivo();
         $this->refreshTimerState();
     }
@@ -962,6 +964,17 @@ public function salvaNuovoPresidio()
         $this->persistPagamentoIntervento();
 
         if ($this->interventoCompletabile) {
+            $riepilogoOrdine = $this->riepilogoOrdine;
+            $extraPresidi = $riepilogoOrdine['extra_presidi'] ?? [];
+            if (($extraPresidi['has_pending_manual_prices'] ?? false) === true) {
+                $codes = collect($extraPresidi['pending_manual_prices'] ?? [])
+                    ->pluck('codice_articolo')
+                    ->filter()
+                    ->implode(', ');
+                $this->messaggioErrore = 'Manca il prezzo per presidi extra: ' . ($codes !== '' ? $codes : 'completa i codici mancanti');
+                return;
+            }
+
             foreach ($this->intervento->presidiIntervento as $pi) {
                 $this->salvaPresidio($pi->id);
             }
@@ -1413,14 +1426,54 @@ public function salvaNuovoPresidio()
             $this->ordinePreventivo['rows'] ?? [],
             $righeIntervento['rows'] ?? []
         );
+        $extraPresidi = $svc->buildExtraPresidiSummary(
+            $confronto,
+            $this->prezziExtraManuali
+        );
         $anomalie = $svc->buildAnomalieSummaryFromInput($this->input, $this->anomalyLabelMap());
+        $riepilogoEconomico = $svc->buildEconomicSummary(
+            (float) data_get($this->ordinePreventivo, 'header.totale_documento', 0),
+            $extraPresidi,
+            $anomalie
+        );
 
         return [
             'righe_intervento' => $righeIntervento['rows'] ?? [],
             'presidi_senza_codice' => $righeIntervento['missing_mapping'] ?? [],
             'confronto' => $confronto,
+            'extra_presidi' => $extraPresidi,
+            'prezzi_extra_manuali' => $this->prezziExtraManuali,
+            'riepilogo_economico' => $riepilogoEconomico,
             'anomalie' => $anomalie,
         ];
+    }
+
+    public function setPrezzoExtra(string $codiceArticolo, $value): void
+    {
+        $code = $this->normalizeCodiceArticolo($codiceArticolo);
+        if ($code === null) {
+            return;
+        }
+
+        $rawValue = trim((string) $value);
+        if ($rawValue === '') {
+            unset($this->prezziExtraManuali[$code]);
+            $this->persistPrezziExtraManuali();
+            $this->messaggioSuccesso = "Prezzo extra rimosso per {$code}.";
+            return;
+        }
+
+        $parsed = $this->normalizePrezzoExtra($value);
+        if ($parsed === null) {
+            unset($this->prezziExtraManuali[$code]);
+            $this->persistPrezziExtraManuali();
+            $this->messaggioErrore = "Prezzo non valido per codice {$code}.";
+            return;
+        }
+
+        $this->prezziExtraManuali[$code] = $parsed;
+        $this->persistPrezziExtraManuali();
+        $this->messaggioSuccesso = "Prezzo extra salvato per {$code}.";
     }
 
     private function caricaOrdinePreventivo(): void
@@ -1631,6 +1684,20 @@ public function salvaNuovoPresidio()
             $this->intervento->setRelation('cliente', $this->intervento->cliente->fresh());
         }
 
+        if (array_key_exists('prezziExtraManuali', $payload) && is_array($payload['prezziExtraManuali'])) {
+            $newMap = [];
+            foreach ($payload['prezziExtraManuali'] as $code => $price) {
+                $normalizedCode = $this->normalizeCodiceArticolo($code);
+                $normalizedPrice = $this->normalizePrezzoExtra($price);
+                if ($normalizedCode === null || $normalizedPrice === null) {
+                    continue;
+                }
+                $newMap[$normalizedCode] = $normalizedPrice;
+            }
+            $this->prezziExtraManuali = $newMap;
+            $this->persistPrezziExtraManuali();
+        }
+
         if ($updated > 0) {
             $this->intervento->load(...$this->interventoRelations());
             $this->messaggioSuccesso = 'Modifiche offline sincronizzate con successo.';
@@ -1700,6 +1767,84 @@ public function salvaNuovoPresidio()
         return 'mailto:' . $emailCliente
             . '?subject=' . rawurlencode($subject)
             . '&body=' . rawurlencode($body);
+    }
+
+    private function loadPrezziExtraManualiFromPayload(): array
+    {
+        $payload = $this->intervento->fatturazione_payload;
+        if (is_string($payload)) {
+            $decoded = json_decode($payload, true);
+            $payload = is_array($decoded) ? $decoded : [];
+        }
+        if (!is_array($payload)) {
+            $payload = [];
+        }
+
+        $raw = $payload['prezzi_extra'] ?? [];
+        if (!is_array($raw)) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($raw as $code => $price) {
+            $normalizedCode = $this->normalizeCodiceArticolo($code);
+            $normalizedPrice = $this->normalizePrezzoExtra($price);
+            if ($normalizedCode === null || $normalizedPrice === null) {
+                continue;
+            }
+            $out[$normalizedCode] = $normalizedPrice;
+        }
+
+        return $out;
+    }
+
+    private function persistPrezziExtraManuali(): void
+    {
+        $payload = $this->intervento->fatturazione_payload;
+        if (is_string($payload)) {
+            $decoded = json_decode($payload, true);
+            $payload = is_array($decoded) ? $decoded : [];
+        }
+        if (!is_array($payload)) {
+            $payload = [];
+        }
+
+        $payload['prezzi_extra'] = $this->prezziExtraManuali;
+        $this->intervento->fatturazione_payload = $payload;
+        $this->intervento->save();
+    }
+
+    private function normalizeCodiceArticolo($value): ?string
+    {
+        $code = mb_strtoupper(trim((string) $value));
+        return $code === '' ? null : $code;
+    }
+
+    private function normalizePrezzoExtra($value): ?float
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return null;
+        }
+
+        $raw = preg_replace('/[^0-9,.\-]/', '', $raw);
+        $raw = str_replace(',', '.', (string) $raw);
+        if (substr_count((string) $raw, '.') > 1) {
+            $parts = explode('.', (string) $raw);
+            $decimal = array_pop($parts);
+            $raw = implode('', $parts) . '.' . $decimal;
+        }
+
+        if (!is_numeric($raw)) {
+            return null;
+        }
+
+        $n = round((float) $raw, 4);
+        return $n >= 0 ? $n : null;
     }
 
 

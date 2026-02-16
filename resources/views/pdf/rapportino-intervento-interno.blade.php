@@ -134,7 +134,7 @@
             @endforelse
         </tbody>
     </table>
-    <div class="note">I prezzi vengono letti solo dall'ordine Business.</div>
+    <div class="note">Prezzi da ordine Business; per codici extra non presenti in ordine si usa il prezzo manuale inserito dal tecnico.</div>
 
     @if(!empty($righeIntervento['missing_mapping'] ?? []))
         <h2>Presidi Senza Codice Articolo</h2>
@@ -159,10 +159,76 @@
     @endif
 
     @php
-        $totaleOrdineBusiness = (float) data_get($ordinePreventivo, 'header.totale_documento', 0);
-        $extraAnomalieRiparate = (float) (($anomalieRiepilogo['importo_riparate'] ?? 0));
-        $totaleInterventoAggiornato = $totaleOrdineBusiness + $extraAnomalieRiparate;
+        $extraPresidiSummary = $extraPresidiSummary ?? ['rows' => [], 'has_pending_manual_prices' => false, 'pending_manual_prices' => [], 'totale_extra' => 0];
+        $riepilogoEconomico = $riepilogoEconomico ?? [
+            'totale_ordine_business' => 0,
+            'extra_presidi' => 0,
+            'extra_anomalie_riparate' => 0,
+            'totale_aggiornato' => 0,
+        ];
     @endphp
+
+    @if(!empty($extraPresidiSummary['rows'] ?? []))
+        <h2>Extra Presidi</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Cod. Art.</th>
+                    <th>Descrizione</th>
+                    <th>Q.tà Extra</th>
+                    <th>Prezzo Unit.</th>
+                    <th>Importo Extra</th>
+                    <th>Fonte</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach(($extraPresidiSummary['rows'] ?? []) as $row)
+                    <tr>
+                        <td>{{ $row['codice_articolo'] }}</td>
+                        <td>{{ $row['descrizione'] ?: '-' }}</td>
+                        <td>{{ number_format((float)($row['quantita_extra'] ?? 0), 2, ',', '.') }}</td>
+                        <td>
+                            @if(($row['prezzo_unitario'] ?? null) !== null)
+                                € {{ number_format((float)$row['prezzo_unitario'], 2, ',', '.') }}
+                            @else
+                                DA DEFINIRE
+                            @endif
+                        </td>
+                        <td>
+                            @if(($row['importo_extra'] ?? null) !== null)
+                                € {{ number_format((float)$row['importo_extra'], 2, ',', '.') }}
+                            @else
+                                —
+                            @endif
+                        </td>
+                        <td>
+                            @if(($row['prezzo_source'] ?? '') === 'ordine')
+                                Ordine Business
+                            @elseif(($row['prezzo_source'] ?? '') === 'manuale')
+                                Inserito tecnico
+                            @else
+                                Prezzo richiesto
+                            @endif
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    @endif
+
+    <h2>Riepilogo Economico</h2>
+    <div class="note">
+        <strong>Totale ordine Business:</strong> € {{ number_format((float)($riepilogoEconomico['totale_ordine_business'] ?? 0), 2, ',', '.') }}<br>
+        <strong>Extra presidi:</strong> € {{ number_format((float)($riepilogoEconomico['extra_presidi'] ?? 0), 2, ',', '.') }}<br>
+        <strong>Extra anomalie riparate:</strong> € {{ number_format((float)($riepilogoEconomico['extra_anomalie_riparate'] ?? 0), 2, ',', '.') }}<br>
+        <strong>Totale intervento aggiornato:</strong> € {{ number_format((float)($riepilogoEconomico['totale_aggiornato'] ?? 0), 2, ',', '.') }}
+    </div>
+
+    @if(($extraPresidiSummary['has_pending_manual_prices'] ?? false) === true)
+        <div class="note">
+            <strong>Attenzione:</strong> alcuni extra presidi non hanno ancora un prezzo manuale assegnato.
+        </div>
+    @endif
 
     <h2>Confronto Ordine Preventivo</h2>
     @if(!($ordinePreventivo['found'] ?? false))
@@ -176,8 +242,9 @@
             <strong>Data:</strong> {{ !empty($h['data']) ? \Carbon\Carbon::parse($h['data'])->format('d/m/Y') : '-' }}<br>
             <strong>Conto:</strong> {{ $h['conto'] ?? '-' }}<br>
             <strong>Totale Documento:</strong> € {{ number_format((float)($h['totale_documento'] ?? 0), 2, ',', '.') }}<br>
-            <strong>Extra Anomalie Riparate:</strong> € {{ number_format($extraAnomalieRiparate, 2, ',', '.') }}<br>
-            <strong>Totale Intervento Aggiornato:</strong> € {{ number_format($totaleInterventoAggiornato, 2, ',', '.') }}
+            <strong>Extra Presidi:</strong> € {{ number_format((float)($riepilogoEconomico['extra_presidi'] ?? 0), 2, ',', '.') }}<br>
+            <strong>Extra Anomalie Riparate:</strong> € {{ number_format((float)($riepilogoEconomico['extra_anomalie_riparate'] ?? 0), 2, ',', '.') }}<br>
+            <strong>Totale Intervento Aggiornato:</strong> € {{ number_format((float)($riepilogoEconomico['totale_aggiornato'] ?? 0), 2, ',', '.') }}
         </div>
 
         <h2>Righe Ordine (Business)</h2>

@@ -37,6 +37,11 @@ class RapportinoInterventoService
             $ordinePreventivo['rows'] ?? [],
             $righeIntervento['rows'] ?? []
         );
+        $prezziExtraManuali = $this->extractPrezziExtraManuali($intervento);
+        $extraPresidiSummary = $ordiniSvc->buildExtraPresidiSummary(
+            $confrontoOrdine,
+            $prezziExtraManuali
+        );
         $anomaliaQuery = Anomalia::query()->select(['id', 'etichetta']);
         if (Schema::hasColumn('anomalie', 'prezzo')) {
             $anomaliaQuery->addSelect('prezzo');
@@ -54,6 +59,11 @@ class RapportinoInterventoService
                 ])
                 ->toArray()
         );
+        $riepilogoEconomico = $ordiniSvc->buildEconomicSummary(
+            (float) data_get($ordinePreventivo, 'header.totale_documento', 0),
+            $extraPresidiSummary,
+            $anomalieRiepilogo
+        );
         $hasAnomaliaItemsTable = Schema::hasTable('presidio_intervento_anomalie');
 
         return [
@@ -61,12 +71,18 @@ class RapportinoInterventoService
             'ordinePreventivo' => $ordinePreventivo,
             'righeIntervento' => $righeIntervento,
             'confrontoOrdine' => $confrontoOrdine,
+            'extraPresidiSummary' => $extraPresidiSummary,
+            'riepilogoEconomico' => $riepilogoEconomico,
+            'prezziExtraManuali' => $prezziExtraManuali,
             'anomalieRiepilogo' => $anomalieRiepilogo,
             'hasAnomaliaItemsTable' => $hasAnomaliaItemsTable,
             'riepilogoOrdine' => [
                 'righe_intervento' => $righeIntervento['rows'] ?? [],
                 'presidi_senza_codice' => $righeIntervento['missing_mapping'] ?? [],
                 'confronto' => $confrontoOrdine,
+                'extra_presidi' => $extraPresidiSummary,
+                'riepilogo_economico' => $riepilogoEconomico,
+                'prezzi_extra_manuali' => $prezziExtraManuali,
                 'anomalie' => $anomalieRiepilogo,
             ],
         ];
@@ -114,5 +130,37 @@ class RapportinoInterventoService
         }
 
         return $relations;
+    }
+
+    private function extractPrezziExtraManuali(Intervento $intervento): array
+    {
+        $payload = $intervento->fatturazione_payload;
+        if (is_string($payload)) {
+            $decoded = json_decode($payload, true);
+            $payload = is_array($decoded) ? $decoded : [];
+        }
+        if (!is_array($payload)) {
+            $payload = [];
+        }
+
+        $raw = $payload['prezzi_extra'] ?? [];
+        if (!is_array($raw)) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($raw as $code => $price) {
+            $code = mb_strtoupper(trim((string) $code));
+            if ($code === '') {
+                continue;
+            }
+            $value = is_numeric($price) ? round((float) $price, 4) : null;
+            if ($value === null || $value < 0) {
+                continue;
+            }
+            $out[$code] = $value;
+        }
+
+        return $out;
     }
 }

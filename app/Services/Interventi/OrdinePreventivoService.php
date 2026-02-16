@@ -252,6 +252,119 @@ class OrdinePreventivoService
         ];
     }
 
+    public function buildExtraPresidiSummary(array $confronto, array $manualPricesByCode = []): array
+    {
+        $ordineByCode = [];
+        foreach (($confronto['ordine_by_code'] ?? []) as $row) {
+            $code = $this->normalizeCode($row['codice_articolo'] ?? null);
+            if (!$code) {
+                continue;
+            }
+            $ordineByCode[$code] = [
+                'codice_articolo' => $code,
+                'descrizione' => (string) ($row['descrizione'] ?? ''),
+                'quantita' => (float) ($row['quantita'] ?? 0),
+                'importo' => (float) ($row['importo'] ?? 0),
+            ];
+        }
+
+        $interventoByCode = [];
+        foreach (($confronto['intervento_by_code'] ?? []) as $row) {
+            $code = $this->normalizeCode($row['codice_articolo'] ?? null);
+            if (!$code) {
+                continue;
+            }
+            $interventoByCode[$code] = [
+                'codice_articolo' => $code,
+                'descrizione' => (string) ($row['descrizione'] ?? ''),
+                'quantita' => (float) ($row['quantita'] ?? 0),
+            ];
+        }
+
+        $manualByCode = $this->normalizeManualPriceMap($manualPricesByCode);
+        $codes = array_unique(array_merge(array_keys($ordineByCode), array_keys($interventoByCode)));
+        sort($codes);
+
+        $rows = [];
+        $pending = [];
+        $totaleExtra = 0.0;
+
+        foreach ($codes as $code) {
+            $qOrd = (float) ($ordineByCode[$code]['quantita'] ?? 0);
+            $qInt = (float) ($interventoByCode[$code]['quantita'] ?? 0);
+            $delta = round($qInt - $qOrd, 4);
+
+            if ($delta <= 0) {
+                continue;
+            }
+
+            $descrizione = trim((string) (
+                $interventoByCode[$code]['descrizione'] ?? ($ordineByCode[$code]['descrizione'] ?? '')
+            ));
+
+            $prezzoUnitario = null;
+            $prezzoSource = null;
+            $manualRequired = false;
+
+            if ($qOrd > 0.0001) {
+                $importoOrdine = (float) ($ordineByCode[$code]['importo'] ?? 0);
+                $prezzoUnitario = round($importoOrdine / $qOrd, 4);
+                $prezzoSource = 'ordine';
+            } else {
+                $manualRequired = true;
+                $prezzoUnitario = $manualByCode[$code] ?? null;
+                $prezzoSource = $prezzoUnitario !== null ? 'manuale' : 'manuale_richiesto';
+            }
+
+            $importoExtra = $prezzoUnitario !== null
+                ? round($delta * $prezzoUnitario, 2)
+                : null;
+
+            if ($importoExtra === null) {
+                $pending[] = [
+                    'codice_articolo' => $code,
+                    'descrizione' => $descrizione,
+                    'quantita_extra' => $delta,
+                ];
+            } else {
+                $totaleExtra += $importoExtra;
+            }
+
+            $rows[] = [
+                'codice_articolo' => $code,
+                'descrizione' => $descrizione,
+                'quantita_ordine' => $qOrd,
+                'quantita_intervento' => $qInt,
+                'quantita_extra' => $delta,
+                'prezzo_unitario' => $prezzoUnitario,
+                'prezzo_source' => $prezzoSource,
+                'manual_required' => $manualRequired,
+                'importo_extra' => $importoExtra,
+            ];
+        }
+
+        return [
+            'rows' => $rows,
+            'pending_manual_prices' => $pending,
+            'has_pending_manual_prices' => !empty($pending),
+            'totale_extra' => round($totaleExtra, 2),
+        ];
+    }
+
+    public function buildEconomicSummary(float $totaleOrdineBusiness, array $extraPresidiSummary, array $anomalieSummary): array
+    {
+        $totaleOrdineBusiness = round(max(0, $totaleOrdineBusiness), 2);
+        $extraPresidi = round(max(0, (float) ($extraPresidiSummary['totale_extra'] ?? 0)), 2);
+        $extraAnomalieRiparate = round(max(0, (float) ($anomalieSummary['importo_riparate'] ?? 0)), 2);
+
+        return [
+            'totale_ordine_business' => $totaleOrdineBusiness,
+            'extra_presidi' => $extraPresidi,
+            'extra_anomalie_riparate' => $extraAnomalieRiparate,
+            'totale_aggiornato' => round($totaleOrdineBusiness + $extraPresidi + $extraAnomalieRiparate, 2),
+        ];
+    }
+
     public function buildAnomalieSummaryFromInput(array $input, array $anomaliaMap): array
     {
         $summary = [
@@ -413,13 +526,16 @@ class OrdinePreventivoService
         $categoria = trim($categoria);
         if ($categoria === 'Estintore') {
             $tipo = $presidio->tipoEstintore;
-            $isFullService = $this->isFullServiceContratto($presidio->tipo_contratto ?? null);
+            $tipoContratto = $this->normalizeTipoContratto($presidio->tipo_contratto ?? null);
+            $isFullService = $tipoContratto === 'full_service';
             $codiceBase = $tipo?->codice_articolo_fatturazione ?: $tipo?->sigla;
             $codiceFull = $tipo?->codice_articolo_fatturazione_full;
             $codice = $isFullService && !empty($codiceFull) ? $codiceFull : $codiceBase;
             $descr = trim((string) (($tipo?->sigla ?? '') . ' ' . ($tipo?->descrizione ?? '')));
             if ($isFullService) {
                 $descr = trim($descr . ' [FULL SERVICE]');
+            } elseif ($tipoContratto === 'noleggio') {
+                $descr = trim($descr . ' [NOLEGGIO]');
             }
             return [$this->normalizeCode($codice), $descr ?: 'Estintore'];
         }
@@ -449,24 +565,84 @@ class OrdinePreventivoService
 
     private function isFullServiceContratto($tipoContratto): bool
     {
+        return $this->normalizeTipoContratto($tipoContratto) === 'full_service';
+    }
+
+    private function normalizeTipoContratto($tipoContratto): string
+    {
         $value = mb_strtoupper(trim((string) $tipoContratto));
         if ($value === '') {
-            return false;
+            return 'noleggio';
         }
 
         $normalized = preg_replace('/\s+/', ' ', $value);
         if (!is_string($normalized) || $normalized === '') {
-            return false;
+            return 'noleggio';
         }
 
-        if (str_contains($normalized, 'FULL SERVICE')) {
-            return true;
+        if (
+            str_contains($normalized, 'FULL SERVICE')
+            || str_contains($normalized, 'FULLSERVICE')
+            || (bool) preg_match('/\bFULL\b/u', $normalized)
+        ) {
+            return 'full_service';
         }
 
-        if (str_contains($normalized, 'FULLSERVICE')) {
-            return true;
+        if (
+            str_contains($normalized, 'NOLEGGIO')
+            || str_contains($normalized, 'NOLEG')
+            || str_contains($normalized, 'NOL')
+        ) {
+            return 'noleggio';
         }
 
-        return (bool) preg_match('/\bFULL\b/u', $normalized);
+        return 'noleggio';
+    }
+
+    private function normalizeManualPriceMap(array $raw): array
+    {
+        $out = [];
+        foreach ($raw as $code => $value) {
+            $normalizedCode = $this->normalizeCode($code);
+            if (!$normalizedCode) {
+                continue;
+            }
+
+            $price = $this->normalizeMoneyValue($value);
+            if ($price === null) {
+                continue;
+            }
+
+            $out[$normalizedCode] = $price;
+        }
+
+        return $out;
+    }
+
+    private function normalizeMoneyValue($raw): ?float
+    {
+        if ($raw === null) {
+            return null;
+        }
+
+        $value = trim((string) $raw);
+        if ($value === '') {
+            return null;
+        }
+
+        $value = preg_replace('/[^0-9,.\-]/', '', $value);
+        $value = str_replace(',', '.', (string) $value);
+
+        if (substr_count((string) $value, '.') > 1) {
+            $parts = explode('.', (string) $value);
+            $decimal = array_pop($parts);
+            $value = implode('', $parts) . '.' . $decimal;
+        }
+
+        if (!is_numeric($value)) {
+            return null;
+        }
+
+        return round(max(0, (float) $value), 4);
     }
 }
