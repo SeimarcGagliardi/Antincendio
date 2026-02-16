@@ -1434,7 +1434,14 @@ public function salvaNuovoPresidio()
     {
         return collect($this->anomalie)
             ->flatten(1)
-            ->pluck('etichetta', 'id')
+            ->mapWithKeys(function (Anomalia $anomalia) {
+                return [
+                    (int) $anomalia->id => [
+                        'etichetta' => (string) $anomalia->etichetta,
+                        'prezzo' => (float) ($anomalia->prezzo ?? 0),
+                    ],
+                ];
+            })
             ->toArray();
     }
 

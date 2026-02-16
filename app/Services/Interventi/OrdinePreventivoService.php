@@ -258,6 +258,9 @@ class OrdinePreventivoService
             'totale' => 0,
             'riparate' => 0,
             'preventivo' => 0,
+            'importo_riparate' => 0.0,
+            'importo_preventivo' => 0.0,
+            'importo_totale' => 0.0,
             'dettaglio' => [],
         ];
 
@@ -277,7 +280,10 @@ class OrdinePreventivoService
             }
         }
 
-        ksort($summary['dettaglio']);
+        uasort(
+            $summary['dettaglio'],
+            fn (array $a, array $b) => strnatcasecmp((string) ($a['etichetta'] ?? ''), (string) ($b['etichetta'] ?? ''))
+        );
         $summary['dettaglio'] = array_values($summary['dettaglio']);
 
         return $summary;
@@ -289,6 +295,9 @@ class OrdinePreventivoService
             'totale' => 0,
             'riparate' => 0,
             'preventivo' => 0,
+            'importo_riparate' => 0.0,
+            'importo_preventivo' => 0.0,
+            'importo_totale' => 0.0,
             'dettaglio' => [],
         ];
 
@@ -322,7 +331,10 @@ class OrdinePreventivoService
             }
         }
 
-        ksort($summary['dettaglio']);
+        uasort(
+            $summary['dettaglio'],
+            fn (array $a, array $b) => strnatcasecmp((string) ($a['etichetta'] ?? ''), (string) ($b['etichetta'] ?? ''))
+        );
         $summary['dettaglio'] = array_values($summary['dettaglio']);
 
         return $summary;
@@ -330,27 +342,70 @@ class OrdinePreventivoService
 
     private function accumulaAnomalia(array &$summary, int $anomaliaId, bool $riparata, array $anomaliaMap): void
     {
-        $label = trim((string) ($anomaliaMap[$anomaliaId] ?? ('Anomalia #' . $anomaliaId)));
+        $meta = $this->resolveAnomaliaMeta($anomaliaId, $anomaliaMap);
+        $label = $meta['etichetta'];
+        $prezzo = $meta['prezzo'];
 
-        if (!isset($summary['dettaglio'][$label])) {
-            $summary['dettaglio'][$label] = [
+        $detailKey = (string) $anomaliaId;
+
+        if (!isset($summary['dettaglio'][$detailKey])) {
+            $summary['dettaglio'][$detailKey] = [
+                'anomalia_id' => $anomaliaId,
                 'etichetta' => $label,
+                'prezzo' => $prezzo,
                 'riparate' => 0,
                 'preventivo' => 0,
                 'totale' => 0,
+                'importo_riparate' => 0.0,
+                'importo_preventivo' => 0.0,
+                'importo_totale' => 0.0,
             ];
         }
 
         $summary['totale']++;
-        $summary['dettaglio'][$label]['totale']++;
+        $summary['importo_totale'] += $prezzo;
+        $summary['dettaglio'][$detailKey]['totale']++;
+        $summary['dettaglio'][$detailKey]['importo_totale'] += $prezzo;
 
         if ($riparata) {
             $summary['riparate']++;
-            $summary['dettaglio'][$label]['riparate']++;
+            $summary['importo_riparate'] += $prezzo;
+            $summary['dettaglio'][$detailKey]['riparate']++;
+            $summary['dettaglio'][$detailKey]['importo_riparate'] += $prezzo;
         } else {
             $summary['preventivo']++;
-            $summary['dettaglio'][$label]['preventivo']++;
+            $summary['importo_preventivo'] += $prezzo;
+            $summary['dettaglio'][$detailKey]['preventivo']++;
+            $summary['dettaglio'][$detailKey]['importo_preventivo'] += $prezzo;
         }
+    }
+
+    private function resolveAnomaliaMeta(int $anomaliaId, array $anomaliaMap): array
+    {
+        $raw = $anomaliaMap[$anomaliaId] ?? null;
+
+        if (is_array($raw)) {
+            $label = trim((string) ($raw['etichetta'] ?? ('Anomalia #' . $anomaliaId)));
+            $prezzo = (float) ($raw['prezzo'] ?? 0);
+            return [
+                'etichetta' => $label,
+                'prezzo' => max(0, $prezzo),
+            ];
+        }
+
+        if (is_object($raw)) {
+            $label = trim((string) ($raw->etichetta ?? ('Anomalia #' . $anomaliaId)));
+            $prezzo = (float) ($raw->prezzo ?? 0);
+            return [
+                'etichetta' => $label,
+                'prezzo' => max(0, $prezzo),
+            ];
+        }
+
+        return [
+            'etichetta' => trim((string) ($raw ?? ('Anomalia #' . $anomaliaId))),
+            'prezzo' => 0.0,
+        ];
     }
 
     private function resolveCodiceArticoloAndDescrizione($presidio, string $categoria): array

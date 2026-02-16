@@ -34,7 +34,10 @@ class AnomalieSeeder extends Seeder
             Anomalia::firstOrCreate([
                 'categoria' => $a['categoria'],
                 'etichetta' => $a['etichetta'],
-            ], ['attiva' => true]);
+            ], [
+                'prezzo' => 0,
+                'attiva' => true,
+            ]);
         }
     }
 }

@@ -37,9 +37,22 @@ class RapportinoInterventoService
             $ordinePreventivo['rows'] ?? [],
             $righeIntervento['rows'] ?? []
         );
+        $anomaliaQuery = Anomalia::query()->select(['id', 'etichetta']);
+        if (Schema::hasColumn('anomalie', 'prezzo')) {
+            $anomaliaQuery->addSelect('prezzo');
+        }
+
         $anomalieRiepilogo = $ordiniSvc->buildAnomalieSummaryFromPresidiIntervento(
             $intervento->presidiIntervento,
-            Anomalia::pluck('etichetta', 'id')->toArray()
+            $anomaliaQuery
+                ->get()
+                ->mapWithKeys(fn (Anomalia $anomalia) => [
+                    $anomalia->id => [
+                        'etichetta' => (string) $anomalia->etichetta,
+                        'prezzo' => (float) ($anomalia->prezzo ?? 0),
+                    ],
+                ])
+                ->toArray()
         );
         $hasAnomaliaItemsTable = Schema::hasTable('presidio_intervento_anomalie');
 

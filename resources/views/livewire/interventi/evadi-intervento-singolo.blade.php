@@ -383,7 +383,12 @@
                                             @php
                                                 $anomList = ($anomalie[$pi->presidio->categoria] ?? collect());
                                                 $selectedAnom = collect($input[$pi->id]['anomalie'] ?? [])->map(fn($v)=>(int)$v)->values()->all();
-                                                $anomMap = $anomList->pluck('etichetta', 'id')->toArray();
+                                                $anomMap = $anomList->mapWithKeys(fn($row) => [
+                                                    (int) $row->id => [
+                                                        'etichetta' => (string) $row->etichetta,
+                                                        'prezzo' => (float) ($row->prezzo ?? 0),
+                                                    ],
+                                                ])->toArray();
                                             @endphp
                                             <div class="space-y-2">
                                                 <div class="space-y-1 max-h-36 overflow-auto border border-gray-200 rounded p-2 bg-white">
@@ -395,6 +400,9 @@
                                                                    wire:change="toggleAnomalia({{ $pi->id }}, {{ $anomalia->id }}, $event.target.checked)"
                                                                    class="h-5 w-5 border-gray-300">
                                                             <span>{{ $anomalia->etichetta }}</span>
+                                                            @if((float)($anomalia->prezzo ?? 0) > 0)
+                                                                <span class="text-[11px] text-gray-500">(+€ {{ number_format((float)$anomalia->prezzo, 2, ',', '.') }})</span>
+                                                            @endif
                                                         </label>
                                                     @empty
                                                         <div class="text-xs text-gray-500">Nessuna anomalia configurata per questa categoria.</div>
@@ -407,10 +415,17 @@
                                                             @foreach($selectedAnom as $anomId)
                                                                 @php
                                                                     $rip = (bool)($input[$pi->id]['anomalie_riparate'][$anomId] ?? false);
-                                                                    $label = $anomMap[$anomId] ?? ('Anomalia #'.$anomId);
+                                                                    $meta = $anomMap[$anomId] ?? null;
+                                                                    $label = is_array($meta) ? ($meta['etichetta'] ?? ('Anomalia #'.$anomId)) : ('Anomalia #'.$anomId);
+                                                                    $prezzo = is_array($meta) ? (float)($meta['prezzo'] ?? 0) : 0;
                                                                 @endphp
                                                                 <div class="flex items-center justify-between gap-2 text-xs">
-                                                                    <span class="truncate">{{ $label }}</span>
+                                                                    <span class="truncate">
+                                                                        {{ $label }}
+                                                                        @if($prezzo > 0)
+                                                                            <span class="text-[11px] text-gray-500">(+€ {{ number_format($prezzo, 2, ',', '.') }})</span>
+                                                                        @endif
+                                                                    </span>
                                                                     <label class="inline-flex items-center gap-2 shrink-0">
                                                                         <input type="checkbox"
                                                                                @checked($rip)
@@ -717,7 +732,12 @@
                         @php
                             $anomList = ($anomalie[$pi->presidio->categoria] ?? collect());
                             $selectedAnom = collect($input[$pi->id]['anomalie'] ?? [])->map(fn($v)=>(int)$v)->values()->all();
-                            $anomMap = $anomList->pluck('etichetta', 'id')->toArray();
+                            $anomMap = $anomList->mapWithKeys(fn($row) => [
+                                (int) $row->id => [
+                                    'etichetta' => (string) $row->etichetta,
+                                    'prezzo' => (float) ($row->prezzo ?? 0),
+                                ],
+                            ])->toArray();
                         @endphp
                         <div class="space-y-2">
                             <div class="space-y-1 max-h-44 overflow-auto border border-gray-200 rounded p-2 bg-white">
@@ -729,6 +749,9 @@
                                                wire:change="toggleAnomalia({{ $pi->id }}, {{ $anomalia->id }}, $event.target.checked)"
                                                class="h-5 w-5 border-gray-300">
                                         <span>{{ $anomalia->etichetta }}</span>
+                                        @if((float)($anomalia->prezzo ?? 0) > 0)
+                                            <span class="text-[11px] text-gray-500">(+€ {{ number_format((float)$anomalia->prezzo, 2, ',', '.') }})</span>
+                                        @endif
                                     </label>
                                 @empty
                                     <div class="text-xs text-gray-500">Nessuna anomalia configurata per questa categoria.</div>
@@ -742,10 +765,17 @@
                                         @foreach($selectedAnom as $anomId)
                                             @php
                                                 $rip = (bool)($input[$pi->id]['anomalie_riparate'][$anomId] ?? false);
-                                                $label = $anomMap[$anomId] ?? ('Anomalia #'.$anomId);
+                                                $meta = $anomMap[$anomId] ?? null;
+                                                $label = is_array($meta) ? ($meta['etichetta'] ?? ('Anomalia #'.$anomId)) : ('Anomalia #'.$anomId);
+                                                $prezzo = is_array($meta) ? (float)($meta['prezzo'] ?? 0) : 0;
                                             @endphp
                                             <div class="flex items-center justify-between gap-2 text-sm">
-                                                <span class="truncate">{{ $label }}</span>
+                                                <span class="truncate">
+                                                    {{ $label }}
+                                                    @if($prezzo > 0)
+                                                        <span class="text-[11px] text-gray-500">(+€ {{ number_format($prezzo, 2, ',', '.') }})</span>
+                                                    @endif
+                                                </span>
                                                 <div class="flex items-center gap-3 shrink-0">
                                                     <label class="inline-flex items-center gap-2">
                                                         <input type="checkbox"
@@ -962,8 +992,19 @@
     {{-- Riepilogo Ordine Preventivo --}}
     @php
         $confrontoOrdine = $riepilogoOrdine['confronto'] ?? [];
-        $anomalieRiep = $riepilogoOrdine['anomalie'] ?? ['totale' => 0, 'riparate' => 0, 'preventivo' => 0, 'dettaglio' => []];
+        $anomalieRiep = $riepilogoOrdine['anomalie'] ?? [
+            'totale' => 0,
+            'riparate' => 0,
+            'preventivo' => 0,
+            'importo_riparate' => 0,
+            'importo_preventivo' => 0,
+            'importo_totale' => 0,
+            'dettaglio' => [],
+        ];
         $senzaCodice = $riepilogoOrdine['presidi_senza_codice'] ?? [];
+        $totaleOrdineBusiness = (float) data_get($ordinePreventivo, 'header.totale_documento', 0);
+        $extraAnomalieRiparate = (float) ($anomalieRiep['importo_riparate'] ?? 0);
+        $totaleInterventoAggiornato = $totaleOrdineBusiness + $extraAnomalieRiparate;
     @endphp
     <div class="bg-white border rounded p-4 shadow-sm space-y-4">
         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
@@ -1086,7 +1127,7 @@
             @endif
         @endif
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
             <div class="rounded border border-gray-200 p-2">
                 <div class="text-xs text-gray-500">Anomalie totali</div>
                 <div class="text-lg font-semibold">{{ $anomalieRiep['totale'] ?? 0 }}</div>
@@ -1099,6 +1140,14 @@
                 <div class="text-xs text-amber-700">Da preventivare</div>
                 <div class="text-lg font-semibold text-amber-700">{{ $anomalieRiep['preventivo'] ?? 0 }}</div>
             </div>
+            <div class="rounded border border-green-200 bg-green-50 p-2">
+                <div class="text-xs text-green-700">Extra anomalie riparate</div>
+                <div class="text-lg font-semibold text-green-700">€ {{ number_format((float)($anomalieRiep['importo_riparate'] ?? 0), 2, ',', '.') }}</div>
+            </div>
+            <div class="rounded border border-gray-300 bg-gray-50 p-2">
+                <div class="text-xs text-gray-700">Totale intervento aggiornato</div>
+                <div class="text-lg font-semibold text-gray-800">€ {{ number_format($totaleInterventoAggiornato, 2, ',', '.') }}</div>
+            </div>
         </div>
 
         @if(!empty($anomalieRiep['dettaglio']))
@@ -1107,18 +1156,24 @@
                     <thead class="bg-gray-100 text-gray-600">
                         <tr>
                             <th class="p-2 text-left">Anomalia</th>
+                            <th class="p-2 text-right">Prezzo</th>
                             <th class="p-2 text-right">Totale</th>
                             <th class="p-2 text-right">Riparate</th>
                             <th class="p-2 text-right">Preventivo</th>
+                            <th class="p-2 text-right">Importo riparate</th>
+                            <th class="p-2 text-right">Importo preventivo</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach($anomalieRiep['dettaglio'] as $row)
                             <tr class="border-t">
                                 <td class="p-2">{{ $row['etichetta'] }}</td>
+                                <td class="p-2 text-right">€ {{ number_format((float)($row['prezzo'] ?? 0), 2, ',', '.') }}</td>
                                 <td class="p-2 text-right">{{ $row['totale'] }}</td>
                                 <td class="p-2 text-right text-green-700">{{ $row['riparate'] }}</td>
                                 <td class="p-2 text-right text-amber-700">{{ $row['preventivo'] }}</td>
+                                <td class="p-2 text-right text-green-700">€ {{ number_format((float)($row['importo_riparate'] ?? 0), 2, ',', '.') }}</td>
+                                <td class="p-2 text-right text-amber-700">€ {{ number_format((float)($row['importo_preventivo'] ?? 0), 2, ',', '.') }}</td>
                             </tr>
                         @endforeach
                     </tbody>

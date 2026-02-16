@@ -115,11 +115,48 @@
     </table>
 
     <h2>Riepilogo Anomalie</h2>
+    @php
+        $totaleOrdineBusiness = (float) data_get($ordinePreventivo, 'header.totale_documento', 0);
+        $extraAnomalieRiparate = (float) (($anomalieRiepilogo['importo_riparate'] ?? 0));
+        $totaleInterventoAggiornato = $totaleOrdineBusiness + $extraAnomalieRiparate;
+    @endphp
     <div class="note">
         <strong>Totale:</strong> {{ $anomalieRiepilogo['totale'] ?? 0 }}<br>
         <strong>Riparate:</strong> {{ $anomalieRiepilogo['riparate'] ?? 0 }}<br>
-        <strong>Da preventivare:</strong> {{ $anomalieRiepilogo['preventivo'] ?? 0 }}
+        <strong>Da preventivare:</strong> {{ $anomalieRiepilogo['preventivo'] ?? 0 }}<br>
+        <strong>Importo riparate:</strong> € {{ number_format((float)($anomalieRiepilogo['importo_riparate'] ?? 0), 2, ',', '.') }}<br>
+        <strong>Importo preventivo:</strong> € {{ number_format((float)($anomalieRiepilogo['importo_preventivo'] ?? 0), 2, ',', '.') }}<br>
+        <strong>Totale intervento aggiornato:</strong> € {{ number_format($totaleInterventoAggiornato, 2, ',', '.') }}
     </div>
+
+    @if(!empty($anomalieRiepilogo['dettaglio'] ?? []))
+        <table>
+            <thead>
+                <tr>
+                    <th>Anomalia</th>
+                    <th>Prezzo</th>
+                    <th>Totale</th>
+                    <th>Riparate</th>
+                    <th>Preventivo</th>
+                    <th>Imp. Riparate</th>
+                    <th>Imp. Preventivo</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach(($anomalieRiepilogo['dettaglio'] ?? []) as $row)
+                    <tr>
+                        <td>{{ $row['etichetta'] }}</td>
+                        <td>€ {{ number_format((float)($row['prezzo'] ?? 0), 2, ',', '.') }}</td>
+                        <td>{{ $row['totale'] }}</td>
+                        <td>{{ $row['riparate'] }}</td>
+                        <td>{{ $row['preventivo'] }}</td>
+                        <td>€ {{ number_format((float)($row['importo_riparate'] ?? 0), 2, ',', '.') }}</td>
+                        <td>€ {{ number_format((float)($row['importo_preventivo'] ?? 0), 2, ',', '.') }}</td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    @endif
 
     @php $noteIntervento = $intervento->note ?? $intervento->note_generali ?? null; @endphp
     @if($noteIntervento)

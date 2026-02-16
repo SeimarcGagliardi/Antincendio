@@ -158,6 +158,12 @@
         </table>
     @endif
 
+    @php
+        $totaleOrdineBusiness = (float) data_get($ordinePreventivo, 'header.totale_documento', 0);
+        $extraAnomalieRiparate = (float) (($anomalieRiepilogo['importo_riparate'] ?? 0));
+        $totaleInterventoAggiornato = $totaleOrdineBusiness + $extraAnomalieRiparate;
+    @endphp
+
     <h2>Confronto Ordine Preventivo</h2>
     @if(!($ordinePreventivo['found'] ?? false))
         <div class="note">
@@ -169,7 +175,9 @@
             <strong>Ordine:</strong> {{ ($h['tipork'] ?? '-') . '/' . ($h['serie'] ?? '-') . '/' . ($h['anno'] ?? '-') . '/' . ($h['numero'] ?? '-') }}<br>
             <strong>Data:</strong> {{ !empty($h['data']) ? \Carbon\Carbon::parse($h['data'])->format('d/m/Y') : '-' }}<br>
             <strong>Conto:</strong> {{ $h['conto'] ?? '-' }}<br>
-            <strong>Totale Documento:</strong> € {{ number_format((float)($h['totale_documento'] ?? 0), 2, ',', '.') }}
+            <strong>Totale Documento:</strong> € {{ number_format((float)($h['totale_documento'] ?? 0), 2, ',', '.') }}<br>
+            <strong>Extra Anomalie Riparate:</strong> € {{ number_format($extraAnomalieRiparate, 2, ',', '.') }}<br>
+            <strong>Totale Intervento Aggiornato:</strong> € {{ number_format($totaleInterventoAggiornato, 2, ',', '.') }}
         </div>
 
         <h2>Righe Ordine (Business)</h2>
@@ -249,25 +257,33 @@
     <div class="note">
         <strong>Totale:</strong> {{ $anomalieRiepilogo['totale'] ?? 0 }}<br>
         <strong>Riparate:</strong> {{ $anomalieRiepilogo['riparate'] ?? 0 }}<br>
-        <strong>Da preventivare:</strong> {{ $anomalieRiepilogo['preventivo'] ?? 0 }}
+        <strong>Da preventivare:</strong> {{ $anomalieRiepilogo['preventivo'] ?? 0 }}<br>
+        <strong>Importo riparate:</strong> € {{ number_format((float)($anomalieRiepilogo['importo_riparate'] ?? 0), 2, ',', '.') }}<br>
+        <strong>Importo preventivo:</strong> € {{ number_format((float)($anomalieRiepilogo['importo_preventivo'] ?? 0), 2, ',', '.') }}
     </div>
     @if(!empty($anomalieRiepilogo['dettaglio'] ?? []))
         <table>
             <thead>
                 <tr>
                     <th>Anomalia</th>
+                    <th>Prezzo</th>
                     <th>Totale</th>
                     <th>Riparate</th>
                     <th>Preventivo</th>
+                    <th>Imp. Riparate</th>
+                    <th>Imp. Preventivo</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach(($anomalieRiepilogo['dettaglio'] ?? []) as $row)
                     <tr>
                         <td>{{ $row['etichetta'] }}</td>
+                        <td>€ {{ number_format((float)($row['prezzo'] ?? 0), 2, ',', '.') }}</td>
                         <td>{{ $row['totale'] }}</td>
                         <td>{{ $row['riparate'] }}</td>
                         <td>{{ $row['preventivo'] }}</td>
+                        <td>€ {{ number_format((float)($row['importo_riparate'] ?? 0), 2, ',', '.') }}</td>
+                        <td>€ {{ number_format((float)($row['importo_preventivo'] ?? 0), 2, ',', '.') }}</td>
                     </tr>
                 @endforeach
             </tbody>
