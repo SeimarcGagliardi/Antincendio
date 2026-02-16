@@ -988,7 +988,9 @@ public function ricalcola(string $scope, int $index): void
                     'data_serbatoio','data_revisione','data_collaudo',
                     'data_fine_vita','data_sostituzione','data_ultima_revisione','marca_serbatoio',
                     'idrante_tipo_id','idrante_lunghezza','idrante_sopra_suolo','idrante_sotto_suolo','porta_tipo_id',
-                ])
+                ]) + [
+                    'data_eliminazione' => null,
+                ]
             );
 
             $p->delete();                 // rimuove dalla tabella d’import

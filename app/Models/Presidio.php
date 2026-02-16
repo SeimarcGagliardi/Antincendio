@@ -9,11 +9,16 @@ use App\Models\ClassificazioneEstintore;
 use App\Models\TipoPresidio;
 use App\Services\Presidi\ProgressivoParser;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class Presidio extends Model
 {
     use HasFactory;
+
+    private static ?bool $hasAttivoColumn = null;
+    private static ?bool $hasDataEliminazioneColumn = null;
 
     protected $table = 'presidi';
 
@@ -26,14 +31,17 @@ class Presidio extends Model
         'data_fine_vita', 'data_sostituzione',
         'flag_anomalia1', 'flag_anomalia2', 'flag_anomalia3',
         'note', 'flag_preventivo', 'data_acquisto', 'scadenza_presidio',
+        'attivo', 'data_eliminazione',
     ];
 
     protected $casts = [
         'idrante_sopra_suolo' => 'boolean',
         'idrante_sotto_suolo' => 'boolean',
+        'attivo' => 'boolean',
         'progressivo_num' => 'integer',
         'idrante_tipo_id' => 'integer',
         'porta_tipo_id' => 'integer',
+        'data_eliminazione' => 'datetime',
     ];
 
     // Cutoff per cambiare il periodo di revisione
@@ -112,7 +120,53 @@ class Presidio extends Model
             ->where('sede_id', $sedeId)
             ->where('categoria', $categoria)
             ->where('progressivo', $progressivo)
-            ->where('attivo', true);
+            ->attivi();
+    }
+
+    public function scopeAttivi(Builder $query): Builder
+    {
+        if (self::hasDataEliminazioneColumn()) {
+            $query->whereNull('data_eliminazione');
+        }
+
+        if (self::hasAttivoColumn()) {
+            $query->where('attivo', true);
+        }
+
+        return $query;
+    }
+
+    public function eliminaLogicamente(?Carbon $quando = null): void
+    {
+        $when = $quando ?: now();
+
+        if (self::hasDataEliminazioneColumn()) {
+            $this->data_eliminazione = $when;
+        }
+
+        if (self::hasAttivoColumn()) {
+            $this->attivo = false;
+        }
+
+        $this->save();
+    }
+
+    private static function hasAttivoColumn(): bool
+    {
+        if (self::$hasAttivoColumn === null) {
+            self::$hasAttivoColumn = Schema::hasColumn('presidi', 'attivo');
+        }
+
+        return self::$hasAttivoColumn;
+    }
+
+    private static function hasDataEliminazioneColumn(): bool
+    {
+        if (self::$hasDataEliminazioneColumn === null) {
+            self::$hasDataEliminazioneColumn = Schema::hasColumn('presidi', 'data_eliminazione');
+        }
+
+        return self::$hasDataEliminazioneColumn;
     }
 
     /* ====================== LOGICHE DATA ====================== */

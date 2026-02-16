@@ -7,7 +7,9 @@ use App\Models\Sede;
 use App\Models\TipoEstintore;
 use App\Models\TipoPresidio;
 use Livewire\Component;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class GestionePresidi extends Component
 {
@@ -40,6 +42,7 @@ class GestionePresidi extends Component
     public $sede;
     public $presidioInModifica = null;
     public $presidiData = [];
+    public ?string $dataRiferimento = null;
     protected $listeners = ['presidi-updated' => '$refresh'];
 
     // === Nuovi campi per l'inserimento "in acquisto"
@@ -184,8 +187,9 @@ public function disattiva($id)
 {
     
     $presidio = Presidio::find($id);
-    $presidio->attivo = 0;
-    $presidio->save();
+    if ($presidio) {
+        $presidio->eliminaLogicamente();
+    }
 
     $this->dispatch('toast', type: 'success', message: 'Presidio disattivato.');
     $this->dispatch('$refresh');
@@ -408,11 +412,10 @@ public function ricalcolaDate(int $id): void
             return;
         }
 
-        // Se hai relazioni con FK "restrict", valuta try/catch
-        $presidio->delete();
+        $presidio->eliminaLogicamente();
 
-        session()->flash('message', 'Presidio eliminato definitivamente.');
-        $this->dispatch('toast', type: 'success', message: 'Presidio eliminato definitivamente.');
+        session()->flash('message', 'Presidio eliminato logicamente.');
+        $this->dispatch('toast', type: 'success', message: 'Presidio eliminato logicamente.');
         $this->dispatch('$refresh');
     }
 
@@ -456,12 +459,41 @@ public function ricalcolaDate(int $id): void
 
 
 
-    public function render()
+public function render()
 {
-    $presidi = Presidio::with('tipoEstintore.colore', 'idranteTipoRef', 'portaTipoRef')
-        ->where('cliente_id', $this->clienteId)->where('attivo','1')->where('categoria',$this->categoriaAttiva)
-        ->when($this->sedeId && $this->sedeId !== 'principale', fn($q) => $q->where('sede_id', $this->sedeId))
-        ->orderBy('categoria')
+    $query = Presidio::with('tipoEstintore.colore', 'idranteTipoRef', 'portaTipoRef')
+        ->where('cliente_id', $this->clienteId)
+        ->where('categoria',$this->categoriaAttiva)
+        ->when($this->sedeId && $this->sedeId !== 'principale', fn($q) => $q->where('sede_id', $this->sedeId));
+
+    if ($this->dataRiferimento) {
+        $riferimento = Carbon::parse($this->dataRiferimento)->endOfDay();
+        $hasDataEliminazione = Schema::hasColumn('presidi', 'data_eliminazione');
+        $hasAttivo = Schema::hasColumn('presidi', 'attivo');
+
+        $query->where('created_at', '<=', $riferimento);
+
+        if ($hasDataEliminazione && $hasAttivo) {
+            $query->where(function ($q) use ($riferimento) {
+                $q->where('data_eliminazione', '>', $riferimento)
+                    ->orWhere(function ($q2) {
+                        $q2->whereNull('data_eliminazione')
+                            ->where('attivo', true);
+                    });
+            });
+        } elseif ($hasDataEliminazione) {
+            $query->where(function ($q) use ($riferimento) {
+                $q->whereNull('data_eliminazione')
+                    ->orWhere('data_eliminazione', '>', $riferimento);
+            });
+        } elseif ($hasAttivo) {
+            $query->where('attivo', true);
+        }
+    } else {
+        $query->attivi();
+    }
+
+    $presidi = $query->orderBy('categoria')
         ->orderBy('progressivo_num')
         ->orderBy('progressivo_suffix')
         ->orderBy('progressivo')

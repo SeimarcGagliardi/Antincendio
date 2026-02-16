@@ -351,6 +351,7 @@ class ImportaPresidiMassivo extends Component
     private function countPresidi(int $clienteId, $sedeId): int
     {
         return Presidio::where('cliente_id', $clienteId)
+            ->attivi()
             ->when($sedeId === 'principal', fn($q) => $q->whereNull('sede_id'))
             ->when($sedeId !== 'principal', fn($q) => $q->where('sede_id', $sedeId))
             ->count();

@@ -280,6 +280,7 @@ public function salvaNuovoPresidio()
         // Se non esistono ancora presidi_intervento, generarli
         if ($this->intervento->presidiIntervento->isEmpty()) {
             $presidi = Presidio::where('cliente_id', $intervento->cliente_id)
+            ->attivi()
             ->when(
                 $intervento->sede_id,
                 fn($q) => $q->where('sede_id', $intervento->sede_id),
@@ -677,7 +678,7 @@ public function salvaNuovoPresidio()
             ->where('sede_id', $p->sede_id)
             ->where('categoria', $p->categoria)
             ->where('progressivo', $progressivo)
-            ->where('attivo', true)
+            ->attivi()
             ->where('id', '!=', $p->id)
             ->exists();
 
@@ -917,11 +918,15 @@ public function salvaNuovoPresidio()
             return;
         }
     
+        if ($pi->presidio) {
+            $pi->presidio->eliminaLogicamente();
+        }
+
         unset($this->input[$id]);
         $pi->delete();
     
-        $this->messaggioSuccesso = 'Presidio rimosso dall’intervento.';
-    $this->intervento->load(...$this->interventoRelations());
+        $this->messaggioSuccesso = 'Presidio rimosso dall’intervento (eliminazione logica registrata).';
+        $this->intervento->load(...$this->interventoRelations());
     }
     public function getAnomalieProperty()
     {
@@ -1034,7 +1039,7 @@ public function salvaNuovoPresidio()
             ->where('sede_id', $vecchio->sede_id)
             ->where('categoria', $vecchio->categoria)
             ->where('progressivo', $vecchio->progressivo)
-            ->where('attivo', true)
+            ->attivi()
             ->first();
 
         if ($duplicato && $duplicato->id !== $vecchio->id) {
@@ -1094,9 +1099,8 @@ public function salvaNuovoPresidio()
             $giacenza->increment('quantita');
         }
 
-        $vecchio->attivo = false;
         $vecchio->sostituito_con_presidio_id = $nuovo->id;
-        $vecchio->save();
+        $vecchio->eliminaLogicamente();
 
         $pi->sostituito_con_presidio_id = $nuovo->id;
         $pi->save();
@@ -1183,8 +1187,8 @@ public function salvaNuovoPresidio()
                 $giacenza->increment('quantita');
             }
 
-            $vecchio->attivo = false;
-            $vecchio->save();
+            $vecchio->sostituito_con_presidio_id = $nuovo->id;
+            $vecchio->eliminaLogicamente();
 
             $pi->sostituito_con_presidio_id = $nuovo->id;
         }

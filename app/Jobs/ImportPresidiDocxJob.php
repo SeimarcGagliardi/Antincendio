@@ -10,6 +10,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 class ImportPresidiDocxJob implements ShouldQueue
@@ -51,14 +52,25 @@ class ImportPresidiDocxJob implements ShouldQueue
         }
 
         if ($this->azione === 'overwrite') {
-            \App\Models\Presidio::where('cliente_id', $this->clienteId)
+            $query = \App\Models\Presidio::where('cliente_id', $this->clienteId)
+                ->attivi()
                 ->when($this->sedeId === null, fn($q) => $q->whereNull('sede_id'))
-                ->when($this->sedeId !== null, fn($q) => $q->where('sede_id', $this->sedeId))
-                ->delete();
+                ->when($this->sedeId !== null, fn($q) => $q->where('sede_id', $this->sedeId));
+
+            if (Schema::hasColumn('presidi', 'data_eliminazione')) {
+                $payload = ['data_eliminazione' => now()];
+                if (Schema::hasColumn('presidi', 'attivo')) {
+                    $payload['attivo'] = false;
+                }
+                $query->update($payload);
+            } else {
+                $query->delete();
+            }
         }
 
         if ($this->azione === 'skip_file') {
             $exists = \App\Models\Presidio::where('cliente_id', $this->clienteId)
+                ->attivi()
                 ->when($this->sedeId === null, fn($q) => $q->whereNull('sede_id'))
                 ->when($this->sedeId !== null, fn($q) => $q->where('sede_id', $this->sedeId))
                 ->exists();

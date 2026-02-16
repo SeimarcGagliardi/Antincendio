@@ -15,7 +15,7 @@ class Admin extends Component
 
     public function getClientiSenzaMesiProperty()
     {
-        return Cliente::whereHas('presidi')
+        return Cliente::whereHas('presidi', fn($q) => $q->attivi())
             ->where(function ($q) {
                 $q->whereNull('mesi_visita')
                     ->orWhereJsonLength('mesi_visita', 0);
@@ -27,7 +27,7 @@ class Admin extends Component
     {
         $targets = collect();
 
-        $clientiMain = Cliente::whereHas('presidi', fn($q) => $q->whereNull('sede_id'))
+        $clientiMain = Cliente::whereHas('presidi', fn($q) => $q->attivi()->whereNull('sede_id'))
             ->where(function ($q) {
                 $q->whereNull('mesi_visita')
                     ->orWhereJsonLength('mesi_visita', 0);
@@ -46,7 +46,7 @@ class Admin extends Component
         }
 
         $sedi = \App\Models\Sede::with('cliente')
-            ->whereHas('presidi')
+            ->whereHas('presidi', fn($q) => $q->attivi())
             ->where(function ($q) {
                 $q->whereNull('mesi_visita')
                     ->orWhereJsonLength('mesi_visita', 0);
@@ -101,8 +101,11 @@ class Admin extends Component
     {
         $meseCorrente = str_pad(now()->month, 2, '0', STR_PAD_LEFT);
 
-        return Cliente::with(['sedi.presidi', 'presidi'])
-            ->whereHas('presidi')
+        return Cliente::with([
+                'sedi.presidi' => fn($q) => $q->attivi(),
+                'presidi' => fn($q) => $q->attivi(),
+            ])
+            ->whereHas('presidi', fn($q) => $q->attivi())
             ->whereJsonContains('mesi_visita', $meseCorrente)
             ->get()
             ->filter(function ($cliente) {
@@ -127,7 +130,7 @@ class Admin extends Component
 
     public function render()
     {   
-        $numPresidi = Presidio::where('attivo','1')->count();
+        $numPresidi = Presidio::query()->attivi()->count();
         $numUtenti = User::count();
 
         $inScadenza = $this->getInterventiDaCompletareCount() + $this->getClientiDaPianificareCount();

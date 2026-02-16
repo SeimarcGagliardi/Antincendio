@@ -20,8 +20,11 @@ class ClientiDaPianificare extends Component
 
     public function getClientiDaPianificareProperty()
     {
-        return Cliente::with(['sedi', 'presidi'])
-            ->whereHas('presidi') // clienti che hanno presidi
+        return Cliente::with([
+                'sedi',
+                'presidi' => fn($q) => $q->attivi(),
+            ])
+            ->whereHas('presidi', fn($q) => $q->attivi()) // clienti che hanno presidi attivi
             ->whereJsonContains('mesi_visita', $this->meseSelezionato) // mese attivo
             ->get()
             ->filter(function ($cliente) {

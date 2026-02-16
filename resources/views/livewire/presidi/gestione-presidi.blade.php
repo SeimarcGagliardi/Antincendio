@@ -58,7 +58,28 @@
         <span class="px-2 py-1 rounded bg-gray-100">Categoria: {{ $categoriaAttiva }}</span>
         <span class="px-2 py-1 rounded bg-gray-100">Totale: {{ $presidi->count() }}</span>
         <span class="px-2 py-1 rounded bg-gray-100">Legenda: <span class="font-semibold">MB</span> = marca serbatoio</span>
+        <div class="ml-auto flex items-center gap-2">
+            <label for="data-riferimento" class="text-xs font-semibold text-gray-700">Data riferimento</label>
+            <input id="data-riferimento"
+                   type="date"
+                   wire:model.live="dataRiferimento"
+                   class="border border-gray-300 rounded px-2 py-1 text-xs">
+            @if($dataRiferimento)
+                <button type="button"
+                        wire:click="$set('dataRiferimento', null)"
+                        class="px-2 py-1 rounded border border-gray-300 bg-white hover:bg-gray-50 text-xs">
+                    Oggi
+                </button>
+            @endif
+        </div>
     </div>
+
+    @if($dataRiferimento)
+        <div class="mb-3 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-2">
+            Visualizzazione storica: presidi attivi alla data
+            <strong>{{ \Carbon\Carbon::parse($dataRiferimento)->format('d/m/Y') }}</strong>.
+        </div>
+    @endif
 
     {{-- =================== LISTA PRESIDI =================== --}}
     @if($presidi->isEmpty())

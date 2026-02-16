@@ -9,6 +9,7 @@ use App\Models\TipoEstintore;
 use App\Livewire\Presidi\ImportaPresidi;
 use App\Services\Presidi\ProgressivoParser;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Schema;
 use PhpOffice\PhpWord\IOFactory;
 use PhpOffice\PhpWord\Element\Table;
 use PhpOffice\PhpWord\Element\Text;
@@ -22,6 +23,7 @@ class DocxPresidiImporter
     private array $mesiPreferiti = [];
     private ?\Illuminate\Support\Collection $tipiCache = null;
     private array $existingKeys = [];
+    private bool $hasDataEliminazioneColumn = false;
 
     public function __construct(int $clienteId, ?int $sedeId = null, string $azione = 'skip_duplicates')
     {
@@ -29,6 +31,7 @@ class DocxPresidiImporter
         $this->sedeId = $sedeId;
         $this->azione = $azione;
         $this->mesiPreferiti = $this->caricaMesiPreferiti();
+        $this->hasDataEliminazioneColumn = Schema::hasColumn('presidi', 'data_eliminazione');
         $this->loadExistingKeys();
     }
 
@@ -147,7 +150,7 @@ class DocxPresidiImporter
                                 'flag_anomalia2'    => $flag2,
                                 'flag_anomalia3'    => $flag3,
                                 'note'              => $note,
-                            ]
+                            ] + $this->reactivationPayload()
                         );
                         $this->markExisting('Idrante', $prog['label']);
                         $importati++;
@@ -183,7 +186,7 @@ class DocxPresidiImporter
                                 'flag_anomalia2'    => $flag2,
                                 'flag_anomalia3'    => $flag3,
                                 'note'              => $note,
-                            ]
+                            ] + $this->reactivationPayload()
                         );
                         $this->markExisting('Porta', $prog['label']);
                         $importati++;
@@ -304,7 +307,7 @@ class DocxPresidiImporter
                             'data_collaudo'        => $colAligned ?? $scadCollaudo,
                             'data_fine_vita'       => $fineAligned ?? $fineVita,
                             'data_sostituzione'    => $dataSostituzione,
-                        ]
+                        ] + $this->reactivationPayload()
                     );
 
                     $this->markExisting('Estintore', $prog['label']);
@@ -322,6 +325,7 @@ class DocxPresidiImporter
 
         $rows = Presidio::query()
             ->select('categoria', 'progressivo')
+            ->attivi()
             ->where('cliente_id', $this->clienteId)
             ->when($this->sedeId === null, fn($q) => $q->whereNull('sede_id'))
             ->when($this->sedeId !== null, fn($q) => $q->where('sede_id', $this->sedeId))
@@ -344,6 +348,13 @@ class DocxPresidiImporter
     {
         if ($this->azione !== 'skip_duplicates') return;
         $this->existingKeys[$categoria][$progressivo] = true;
+    }
+
+    private function reactivationPayload(): array
+    {
+        return $this->hasDataEliminazioneColumn
+            ? ['data_eliminazione' => null]
+            : [];
     }
 
     private function resolveSedeId(): ?int

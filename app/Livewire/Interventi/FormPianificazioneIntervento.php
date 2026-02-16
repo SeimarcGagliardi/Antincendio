@@ -154,9 +154,12 @@ class FormPianificazioneIntervento extends Component
     {
         $mese = str_pad($this->meseSelezionato, 2, '0', STR_PAD_LEFT);
 
-        return Cliente::with(['sedi.presidi', 'presidi'])
+        return Cliente::with([
+                'sedi.presidi' => fn($q) => $q->attivi(),
+                'presidi' => fn($q) => $q->attivi(),
+            ])
             ->when($this->zonaFiltro, fn($q) => $q->where('zona', $this->zonaFiltro))
-            ->whereHas('presidi')
+            ->whereHas('presidi', fn($q) => $q->attivi())
             ->where(function ($q) use ($mese) {
                 $meseInt = json_encode((int) $mese);   // "4"
                 $meseStr = json_encode($mese);         // "04"
@@ -178,9 +181,12 @@ class FormPianificazioneIntervento extends Component
     {
         $mese = str_pad($this->meseSelezionato, 2, '0', STR_PAD_LEFT);
     
-        return Cliente::with(['sedi.presidi', 'presidi'])
+        return Cliente::with([
+                'sedi.presidi' => fn($q) => $q->attivi(),
+                'presidi' => fn($q) => $q->attivi(),
+            ])
             ->when($this->zonaFiltro, fn($q) => $q->where('zona', $this->zonaFiltro))
-            ->whereHas('presidi')
+            ->whereHas('presidi', fn($q) => $q->attivi())
             ->where(function ($q) use ($mese) {
                 $meseInt = json_encode((int) $mese);   // "4"
                 $meseStr = json_encode($mese);         // "04"
@@ -251,6 +257,7 @@ class FormPianificazioneIntervento extends Component
         $intervento->tecnici()->attach($attachData);
 
         $presidi = Presidio::where('cliente_id', $cliente->id)
+            ->attivi()
             ->when($sede, fn($q) => $q->where('sede_id', $sede->id))
             ->get();
 
