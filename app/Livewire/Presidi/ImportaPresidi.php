@@ -10,6 +10,7 @@ use PhpOffice\PhpWord\Element\Text;
 use PhpOffice\PhpWord\Element\TextRun;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Schema;
 use App\Models\{TipoEstintore, ImportPresidio, Presidio};
 use App\Models\TipoPresidio;
 use App\Services\Presidi\ProgressivoParser;
@@ -708,6 +709,7 @@ public function ricalcola(string $scope, int $index): void
 
                     $ubic      = $r['ubicazione']      ?? '';
                     $contratto = $r['tipo_contratto']   ?? '';
+                    $joinedUp  = mb_strtoupper(implode(' ', $vals));
 
                     if ($tableType === 'idranti') {
                         $note = $r['note'] ?? null;
@@ -786,7 +788,6 @@ public function ricalcola(string $scope, int $index): void
                     if ($tipoRaw === '') {
                         $tipoRaw = self::extractTipoFromValues($vals) ?? '';
                     }
-                    $joinedUp  = mb_strtoupper(implode(' ', $vals));
                     $isCarrellato = self::isCarrellatoText($tipoRaw . ' ' . $joinedUp);
                     
                     // prima prova col campo dedicato, poi — se vuoto — con tutta la riga
@@ -988,9 +989,7 @@ public function ricalcola(string $scope, int $index): void
                     'data_serbatoio','data_revisione','data_collaudo',
                     'data_fine_vita','data_sostituzione','data_ultima_revisione','marca_serbatoio',
                     'idrante_tipo_id','idrante_lunghezza','idrante_sopra_suolo','idrante_sotto_suolo','porta_tipo_id',
-                ]) + [
-                    'data_eliminazione' => null,
-                ]
+                ]) + $this->reactivationPayloadForPresidi()
             );
 
             $p->delete();                 // rimuove dalla tabella d’import
@@ -1064,6 +1063,19 @@ public function ricalcola(string $scope, int $index): void
             array_diff($this->selezionati, [$id])
         );
         
+    }
+
+    private function reactivationPayloadForPresidi(): array
+    {
+        $payload = [];
+        if (Schema::hasColumn('presidi', 'data_eliminazione')) {
+            $payload['data_eliminazione'] = null;
+        }
+        if (Schema::hasColumn('presidi', 'attivo')) {
+            $payload['attivo'] = true;
+        }
+
+        return $payload;
     }
 
     /* --------------------------------------------------

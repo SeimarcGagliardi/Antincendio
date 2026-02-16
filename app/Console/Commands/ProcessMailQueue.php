@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\MailQueueItem;
 use App\Services\Interventi\MailQueueProcessorService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Schema;
 
 class ProcessMailQueue extends Command
 {
@@ -13,6 +14,11 @@ class ProcessMailQueue extends Command
 
     public function handle(): int
     {
+        if (!Schema::hasTable('mail_queue_items')) {
+            $this->warn('Tabella mail_queue_items non trovata: esegui le migration.');
+            return self::SUCCESS;
+        }
+
         $limit = max(1, (int) $this->option('limit'));
 
         $items = MailQueueItem::query()

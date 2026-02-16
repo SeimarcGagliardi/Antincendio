@@ -4,7 +4,6 @@ namespace App\Services\Presidi;
 
 use App\Models\Cliente;
 use App\Models\Presidio;
-use App\Models\Sede;
 use App\Models\TipoEstintore;
 use App\Livewire\Presidi\ImportaPresidi;
 use App\Services\Presidi\ProgressivoParser;
@@ -24,6 +23,7 @@ class DocxPresidiImporter
     private ?\Illuminate\Support\Collection $tipiCache = null;
     private array $existingKeys = [];
     private bool $hasDataEliminazioneColumn = false;
+    private bool $hasAttivoColumn = false;
 
     public function __construct(int $clienteId, ?int $sedeId = null, string $azione = 'skip_duplicates')
     {
@@ -32,6 +32,7 @@ class DocxPresidiImporter
         $this->azione = $azione;
         $this->mesiPreferiti = $this->caricaMesiPreferiti();
         $this->hasDataEliminazioneColumn = Schema::hasColumn('presidi', 'data_eliminazione');
+        $this->hasAttivoColumn = Schema::hasColumn('presidi', 'attivo');
         $this->loadExistingKeys();
     }
 
@@ -111,6 +112,7 @@ class DocxPresidiImporter
 
                     $ubic      = $r['ubicazione'] ?? '';
                     $contratto = $r['tipo_contratto'] ?? '';
+                    $joinedUp  = mb_strtoupper(implode(' ', $vals));
 
                     if ($tableType === 'idranti') {
                         if ($this->shouldSkipExisting('Idrante', $prog['label'])) {
@@ -197,7 +199,6 @@ class DocxPresidiImporter
                     if ($tipoRaw === '') {
                         $tipoRaw = self::extractTipoFromValues($vals) ?? '';
                     }
-                    $joinedUp = mb_strtoupper(implode(' ', $vals));
                     $isCarrellato = ImportaPresidi::isCarrellatoText($tipoRaw . ' ' . $joinedUp);
 
                     $tipoEstId = $this->guessTipoEstintoreId($tipoRaw !== '' ? $tipoRaw : $joinedUp);
@@ -352,20 +353,20 @@ class DocxPresidiImporter
 
     private function reactivationPayload(): array
     {
-        return $this->hasDataEliminazioneColumn
-            ? ['data_eliminazione' => null]
-            : [];
+        $payload = [];
+        if ($this->hasDataEliminazioneColumn) {
+            $payload['data_eliminazione'] = null;
+        }
+        if ($this->hasAttivoColumn) {
+            $payload['attivo'] = true;
+        }
+
+        return $payload;
     }
 
     private function resolveSedeId(): ?int
     {
-        if ($this->sedeId) return $this->sedeId;
-
-        $sede = Sede::where('cliente_id', $this->clienteId)->first();
-        if ($sede) return $sede->id;
-
-        // Sede principale = sede_id NULL
-        return null;
+        return $this->sedeId;
     }
 
     private function caricaMesiPreferiti(): array

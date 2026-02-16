@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Carbon;
 use App\Models\Cliente;
 use App\Models\Sede;
@@ -35,8 +36,13 @@ class SincronizzaClienti extends Command
         $maxAnagra = $lastAnagra;
 
         foreach ($clienti as $c) {
+            $conto = trim((string) ($c->an_conto ?? ''));
+            if ($conto === '') {
+                continue;
+            }
+
             Cliente::updateOrCreate(
-                ['codice_esterno' => $c->an_conto],
+                ['codice_esterno' => $conto],
                 $this->mapClientePayload($c)
             );
 
@@ -64,6 +70,10 @@ class SincronizzaClienti extends Command
 
         if ($destdiv->isNotEmpty()) {
             $conti = $destdiv->pluck('dd_conto')->unique()->values();
+            $conti = $conti
+                ->map(fn ($conto) => trim((string) $conto))
+                ->filter()
+                ->values();
             $clientiLocal = Cliente::whereIn('codice_esterno', $conti)->get()->keyBy('codice_esterno');
 
             $missingConti = $conti->diff($clientiLocal->keys());
@@ -73,23 +83,38 @@ class SincronizzaClienti extends Command
                     ->get();
 
                 foreach ($missing as $c) {
+                    $conto = trim((string) ($c->an_conto ?? ''));
+                    if ($conto === '') {
+                        continue;
+                    }
+
                     $cliente = Cliente::updateOrCreate(
-                        ['codice_esterno' => $c->an_conto],
+                        ['codice_esterno' => $conto],
                         $this->mapClientePayload($c)
                     );
-                    $clientiLocal->put($c->an_conto, $cliente);
+                    $clientiLocal->put($conto, $cliente);
                 }
             }
 
             foreach ($destdiv as $s) {
-                $cliente = $clientiLocal->get($s->dd_conto);
+                $conto = trim((string) ($s->dd_conto ?? ''));
+                if ($conto === '') {
+                    continue;
+                }
+
+                $cliente = $clientiLocal->get($conto);
                 if (!$cliente) {
+                    continue;
+                }
+
+                $coddest = trim((string) ($s->dd_coddest ?? ''));
+                if ($coddest === '') {
                     continue;
                 }
 
                 Sede::updateOrCreate(
                     [
-                        'codice_esterno' => $s->dd_conto . '-' . $s->dd_coddest,
+                        'codice_esterno' => $conto . '-' . $coddest,
                         'cliente_id' => $cliente->id,
                     ],
                     [
@@ -118,6 +143,10 @@ class SincronizzaClienti extends Command
 
     private function getLastSync(string $key): ?Carbon
     {
+        if (!Schema::hasTable('sync_statuses')) {
+            return null;
+        }
+
         $row = DB::table('sync_statuses')->where('key', $key)->first();
         if (!$row || !$row->last_synced_at) {
             return null;
@@ -129,6 +158,9 @@ class SincronizzaClienti extends Command
     private function setLastSync(string $key, ?Carbon $timestamp): void
     {
         if (!$timestamp) {
+            return;
+        }
+        if (!Schema::hasTable('sync_statuses')) {
             return;
         }
 
