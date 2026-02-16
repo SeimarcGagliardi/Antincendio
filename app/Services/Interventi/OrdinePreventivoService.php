@@ -365,7 +365,7 @@ class OrdinePreventivoService
         ];
     }
 
-    public function buildAnomalieSummaryFromInput(array $input, array $anomaliaMap): array
+    public function buildAnomalieSummaryFromInput(array $input, array $anomaliaMap, array $presidioByPiId = []): array
     {
         $summary = [
             'totale' => 0,
@@ -377,7 +377,10 @@ class OrdinePreventivoService
             'dettaglio' => [],
         ];
 
-        foreach ($input as $dati) {
+        foreach ($input as $piIdRaw => $dati) {
+            $piId = is_numeric($piIdRaw) ? (int) $piIdRaw : null;
+            $presidioContext = ($piId !== null && isset($presidioByPiId[$piId])) ? $presidioByPiId[$piId] : null;
+
             $ids = collect($dati['anomalie'] ?? [])
                 ->filter(fn ($id) => is_numeric($id))
                 ->map(fn ($id) => (int) $id)
@@ -389,7 +392,7 @@ class OrdinePreventivoService
 
             foreach ($ids as $id) {
                 $riparata = filter_var($riparateMap[$id] ?? false, FILTER_VALIDATE_BOOL);
-                $this->accumulaAnomalia($summary, $id, $riparata, $anomaliaMap);
+                $this->accumulaAnomalia($summary, $id, $riparata, $anomaliaMap, $presidioContext);
             }
         }
 
@@ -428,7 +431,8 @@ class OrdinePreventivoService
                             $summary,
                             (int) $item->anomalia_id,
                             (bool) $item->riparata,
-                            $anomaliaMap
+                            $anomaliaMap,
+                            $pi
                         );
                     }
                     continue;
@@ -440,7 +444,7 @@ class OrdinePreventivoService
                 ? collect($decoded)->filter(fn ($id) => is_numeric($id))->map(fn ($id) => (int) $id)->unique()->values()->all()
                 : [];
             foreach ($ids as $id) {
-                $this->accumulaAnomalia($summary, (int) $id, false, $anomaliaMap);
+                $this->accumulaAnomalia($summary, (int) $id, false, $anomaliaMap, $pi);
             }
         }
 
@@ -453,13 +457,14 @@ class OrdinePreventivoService
         return $summary;
     }
 
-    private function accumulaAnomalia(array &$summary, int $anomaliaId, bool $riparata, array $anomaliaMap): void
+    private function accumulaAnomalia(array &$summary, int $anomaliaId, bool $riparata, array $anomaliaMap, $presidioContext = null): void
     {
-        $meta = $this->resolveAnomaliaMeta($anomaliaId, $anomaliaMap);
+        $meta = $this->resolveAnomaliaMeta($anomaliaId, $anomaliaMap, $presidioContext);
         $label = $meta['etichetta'];
         $prezzo = $meta['prezzo'];
+        $prezzoKey = number_format((float) $prezzo, 2, '.', '');
 
-        $detailKey = (string) $anomaliaId;
+        $detailKey = (string) $anomaliaId . ':' . $prezzoKey;
 
         if (!isset($summary['dettaglio'][$detailKey])) {
             $summary['dettaglio'][$detailKey] = [
@@ -493,31 +498,123 @@ class OrdinePreventivoService
         }
     }
 
-    private function resolveAnomaliaMeta(int $anomaliaId, array $anomaliaMap): array
+    private function resolveAnomaliaMeta(int $anomaliaId, array $anomaliaMap, $presidioContext = null): array
     {
         $raw = $anomaliaMap[$anomaliaId] ?? null;
 
+        $label = 'Anomalia #' . $anomaliaId;
+        $prezzoBase = 0.0;
+        $usaPrezziTipoEstintore = false;
+        $usaPrezziTipoPresidio = false;
+        $prezziTipoEstintore = [];
+        $prezziTipoPresidio = [];
+
         if (is_array($raw)) {
-            $label = trim((string) ($raw['etichetta'] ?? ('Anomalia #' . $anomaliaId)));
-            $prezzo = (float) ($raw['prezzo'] ?? 0);
+            $label = trim((string) ($raw['etichetta'] ?? $label));
+            $prezzoBase = max(0, (float) ($raw['prezzo'] ?? 0));
+            $usaPrezziTipoEstintore = (bool) ($raw['usa_prezzi_tipo_estintore'] ?? false);
+            $usaPrezziTipoPresidio = (bool) ($raw['usa_prezzi_tipo_presidio'] ?? false);
+            $prezziTipoEstintore = $this->normalizePriceMap($raw['prezzi_tipo_estintore'] ?? []);
+            $prezziTipoPresidio = $this->normalizePriceMap($raw['prezzi_tipo_presidio'] ?? []);
+        } elseif (is_object($raw)) {
+            $label = trim((string) ($raw->etichetta ?? $label));
+            $prezzoBase = max(0, (float) ($raw->prezzo ?? 0));
+            $usaPrezziTipoEstintore = (bool) ($raw->usa_prezzi_tipo_estintore ?? false);
+            $usaPrezziTipoPresidio = (bool) ($raw->usa_prezzi_tipo_presidio ?? false);
+            $prezziTipoEstintore = $this->normalizePriceMap($raw->prezzi_tipo_estintore ?? []);
+            $prezziTipoPresidio = $this->normalizePriceMap($raw->prezzi_tipo_presidio ?? []);
+        } elseif ($raw !== null) {
+            $label = trim((string) $raw);
+        }
+
+        $prezzoEffettivo = $prezzoBase;
+        $ctx = $this->extractPresidioContext($presidioContext);
+
+        if (($ctx['categoria'] ?? null) === 'Estintore' && $usaPrezziTipoEstintore) {
+            $tipoEstintoreId = (int) ($ctx['tipo_estintore_id'] ?? 0);
+            if ($tipoEstintoreId > 0 && array_key_exists($tipoEstintoreId, $prezziTipoEstintore)) {
+                $prezzoEffettivo = (float) $prezziTipoEstintore[$tipoEstintoreId];
+            }
+        }
+
+        if (
+            in_array(($ctx['categoria'] ?? null), ['Idrante', 'Porta'], true)
+            && $usaPrezziTipoPresidio
+        ) {
+            $tipoPresidioId = (int) ($ctx['tipo_presidio_id'] ?? 0);
+            if ($tipoPresidioId > 0 && array_key_exists($tipoPresidioId, $prezziTipoPresidio)) {
+                $prezzoEffettivo = (float) $prezziTipoPresidio[$tipoPresidioId];
+            }
+        }
+
+        return [
+            'etichetta' => $label,
+            'prezzo' => round(max(0, $prezzoEffettivo), 2),
+        ];
+    }
+
+    private function normalizePriceMap($raw): array
+    {
+        $out = [];
+        if (is_object($raw)) {
+            $raw = (array) $raw;
+        }
+        if (!is_array($raw)) {
+            return $out;
+        }
+
+        foreach ($raw as $id => $price) {
+            $key = is_numeric($id) ? (int) $id : null;
+            if (!$key || $key <= 0) {
+                continue;
+            }
+
+            $normalized = $this->normalizeMoneyValue($price);
+            if ($normalized === null) {
+                continue;
+            }
+            $out[$key] = round(max(0, $normalized), 2);
+        }
+
+        return $out;
+    }
+
+    private function extractPresidioContext($context): array
+    {
+        if (is_object($context) && isset($context->presidio)) {
+            $context = $context->presidio;
+        }
+
+        if (is_object($context)) {
+            $categoria = trim((string) ($context->categoria ?? ''));
+            $tipoEstintoreId = (int) ($context->tipo_estintore_id ?? 0);
+            $idranteTipoId = (int) ($context->idrante_tipo_id ?? 0);
+            $portaTipoId = (int) ($context->porta_tipo_id ?? 0);
+
             return [
-                'etichetta' => $label,
-                'prezzo' => max(0, $prezzo),
+                'categoria' => $categoria,
+                'tipo_estintore_id' => $tipoEstintoreId > 0 ? $tipoEstintoreId : null,
+                'tipo_presidio_id' => $idranteTipoId > 0 ? $idranteTipoId : ($portaTipoId > 0 ? $portaTipoId : null),
             ];
         }
 
-        if (is_object($raw)) {
-            $label = trim((string) ($raw->etichetta ?? ('Anomalia #' . $anomaliaId)));
-            $prezzo = (float) ($raw->prezzo ?? 0);
+        if (is_array($context)) {
+            $categoria = trim((string) ($context['categoria'] ?? ''));
+            $tipoEstintoreId = (int) ($context['tipo_estintore_id'] ?? 0);
+            $idranteTipoId = (int) ($context['idrante_tipo_id'] ?? 0);
+            $portaTipoId = (int) ($context['porta_tipo_id'] ?? 0);
+
             return [
-                'etichetta' => $label,
-                'prezzo' => max(0, $prezzo),
+                'categoria' => $categoria,
+                'tipo_estintore_id' => $tipoEstintoreId > 0 ? $tipoEstintoreId : null,
+                'tipo_presidio_id' => $idranteTipoId > 0 ? $idranteTipoId : ($portaTipoId > 0 ? $portaTipoId : null),
             ];
         }
 
         return [
-            'etichetta' => trim((string) ($raw ?? ('Anomalia #' . $anomaliaId))),
-            'prezzo' => 0.0,
+            'categoria' => null,
+            'tipo_estintore_id' => null,
+            'tipo_presidio_id' => null,
         ];
     }
 

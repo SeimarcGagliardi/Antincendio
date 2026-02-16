@@ -135,72 +135,74 @@
         ];
     @endphp
 
-    <div class="section">
-    <h2>Riepilogo Economico</h2>
-    <div class="note">
-        <strong>Totale ordine Business:</strong> € {{ number_format((float)($riepilogoEconomico['totale_ordine_business'] ?? 0), 2, ',', '.') }}<br>
-        <strong>Extra presidi:</strong> € {{ number_format((float)($riepilogoEconomico['extra_presidi'] ?? 0), 2, ',', '.') }}<br>
-        <strong>Extra anomalie riparate:</strong> € {{ number_format((float)($riepilogoEconomico['extra_anomalie_riparate'] ?? 0), 2, ',', '.') }}<br>
-        <strong>Totale intervento aggiornato:</strong> € {{ number_format((float)($riepilogoEconomico['totale_aggiornato'] ?? 0), 2, ',', '.') }}
-    </div>
-    </div>
-
-    @if(!empty($extraPresidiSummary['rows'] ?? []))
-        <div class="section breakable">
-        <h2>Extra Presidi</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>Cod. Art.</th>
-                    <th>Descrizione</th>
-                    <th>Q.tà Extra</th>
-                    <th>Prezzo Unit.</th>
-                    <th>Importo Extra</th>
-                    <th>Fonte</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach(($extraPresidiSummary['rows'] ?? []) as $row)
-                    <tr>
-                        <td>{{ $row['codice_articolo'] }}</td>
-                        <td>{{ $row['descrizione'] ?: '-' }}</td>
-                        <td>{{ number_format((float)($row['quantita_extra'] ?? 0), 2, ',', '.') }}</td>
-                        <td>
-                            @if(($row['prezzo_unitario'] ?? null) !== null)
-                                € {{ number_format((float)$row['prezzo_unitario'], 2, ',', '.') }}
-                            @else
-                                DA DEFINIRE
-                            @endif
-                        </td>
-                        <td>
-                            @if(($row['importo_extra'] ?? null) !== null)
-                                € {{ number_format((float)$row['importo_extra'], 2, ',', '.') }}
-                            @else
-                                —
-                            @endif
-                        </td>
-                        <td>
-                            @if(($row['prezzo_source'] ?? '') === 'ordine')
-                                Ordine Business
-                            @elseif(($row['prezzo_source'] ?? '') === 'manuale')
-                                Inserito tecnico
-                            @else
-                                Prezzo richiesto
-                            @endif
-                        </td>
-                    </tr>
-                @endforeach
-            </tbody>
-        </table>
-        </div>
-    @endif
-
-    @if(($extraPresidiSummary['has_pending_manual_prices'] ?? false) === true)
+    @if($richiedeIncassoTecnico)
         <div class="section">
+        <h2>Riepilogo Economico</h2>
         <div class="note">
-            <strong>Attenzione:</strong> alcuni extra presidi non hanno ancora un prezzo manuale assegnato.
+            <strong>Totale ordine Business:</strong> € {{ number_format((float)($riepilogoEconomico['totale_ordine_business'] ?? 0), 2, ',', '.') }}<br>
+            <strong>Extra presidi:</strong> € {{ number_format((float)($riepilogoEconomico['extra_presidi'] ?? 0), 2, ',', '.') }}<br>
+            <strong>Extra anomalie riparate:</strong> € {{ number_format((float)($riepilogoEconomico['extra_anomalie_riparate'] ?? 0), 2, ',', '.') }}<br>
+            <strong>Totale intervento aggiornato:</strong> € {{ number_format((float)($riepilogoEconomico['totale_aggiornato'] ?? 0), 2, ',', '.') }}
         </div>
         </div>
+
+        @if(!empty($extraPresidiSummary['rows'] ?? []))
+            <div class="section breakable">
+            <h2>Extra Presidi</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Cod. Art.</th>
+                        <th>Descrizione</th>
+                        <th>Q.tà Extra</th>
+                        <th>Prezzo Unit.</th>
+                        <th>Importo Extra</th>
+                        <th>Fonte</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach(($extraPresidiSummary['rows'] ?? []) as $row)
+                        <tr>
+                            <td>{{ $row['codice_articolo'] }}</td>
+                            <td>{{ $row['descrizione'] ?: '-' }}</td>
+                            <td>{{ number_format((float)($row['quantita_extra'] ?? 0), 2, ',', '.') }}</td>
+                            <td>
+                                @if(($row['prezzo_unitario'] ?? null) !== null)
+                                    € {{ number_format((float)$row['prezzo_unitario'], 2, ',', '.') }}
+                                @else
+                                    DA DEFINIRE
+                                @endif
+                            </td>
+                            <td>
+                                @if(($row['importo_extra'] ?? null) !== null)
+                                    € {{ number_format((float)$row['importo_extra'], 2, ',', '.') }}
+                                @else
+                                    —
+                                @endif
+                            </td>
+                            <td>
+                                @if(($row['prezzo_source'] ?? '') === 'ordine')
+                                    Ordine Business
+                                @elseif(($row['prezzo_source'] ?? '') === 'manuale')
+                                    Inserito tecnico
+                                @else
+                                    Prezzo richiesto
+                                @endif
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+            </div>
+        @endif
+
+        @if(($extraPresidiSummary['has_pending_manual_prices'] ?? false) === true)
+            <div class="section">
+            <div class="note">
+                <strong>Attenzione:</strong> alcuni extra presidi non hanno ancora un prezzo manuale assegnato.
+            </div>
+            </div>
+        @endif
     @endif
 
     <div class="section">
@@ -210,8 +212,10 @@
         <strong>Riparate:</strong> {{ $anomalieRiepilogo['riparate'] ?? 0 }}<br>
         <strong>Da preventivare:</strong> {{ $anomalieRiepilogo['preventivo'] ?? 0 }}<br>
         <strong>Importo riparate:</strong> € {{ number_format((float)($anomalieRiepilogo['importo_riparate'] ?? 0), 2, ',', '.') }}<br>
-        <strong>Importo preventivo:</strong> € {{ number_format((float)($anomalieRiepilogo['importo_preventivo'] ?? 0), 2, ',', '.') }}<br>
-        <strong>Totale intervento aggiornato:</strong> € {{ number_format((float)($riepilogoEconomico['totale_aggiornato'] ?? 0), 2, ',', '.') }}
+        <strong>Importo preventivo:</strong> € {{ number_format((float)($anomalieRiepilogo['importo_preventivo'] ?? 0), 2, ',', '.') }}
+        @if($richiedeIncassoTecnico)
+            <br><strong>Totale intervento aggiornato:</strong> € {{ number_format((float)($riepilogoEconomico['totale_aggiornato'] ?? 0), 2, ',', '.') }}
+        @endif
     </div>
     </div>
 

@@ -23,6 +23,8 @@ use Livewire\Attributes\On;
 
 class EvadiInterventoSingolo extends Component
 {
+    private ?array $anomalyMapCache = null;
+
     public Intervento $intervento;
     public $input = [];
     public $vistaSchede = true;
@@ -931,7 +933,31 @@ public function salvaNuovoPresidio()
     }
     public function getAnomalieProperty()
     {
-        return Anomalia::where('attiva', true)->get()->groupBy('categoria');
+        $query = Anomalia::query()
+            ->where('attiva', true)
+            ->select(['id', 'categoria', 'etichetta']);
+
+        if (Schema::hasColumn('anomalie', 'prezzo')) {
+            $query->addSelect('prezzo');
+        }
+        if (Schema::hasColumn('anomalie', 'usa_prezzi_tipo_estintore')) {
+            $query->addSelect('usa_prezzi_tipo_estintore');
+        }
+        if (Schema::hasColumn('anomalie', 'usa_prezzi_tipo_presidio')) {
+            $query->addSelect('usa_prezzi_tipo_presidio');
+        }
+        if (Schema::hasTable('anomalia_prezzi_tipo_estintore')) {
+            $query->with('prezziTipoEstintore:anomalia_id,tipo_estintore_id,prezzo');
+        }
+        if (Schema::hasTable('anomalia_prezzi_tipo_presidio')) {
+            $query->with('prezziTipoPresidio:anomalia_id,tipo_presidio_id,prezzo');
+        }
+
+        return $query
+            ->orderBy('categoria')
+            ->orderBy('etichetta')
+            ->get()
+            ->groupBy('categoria');
     }
 
     public function getTipiEstintoriProperty()
@@ -1448,7 +1474,11 @@ public function salvaNuovoPresidio()
             $confronto,
             $this->prezziExtraManuali
         );
-        $anomalie = $svc->buildAnomalieSummaryFromInput($this->input, $this->anomalyLabelMap());
+        $anomalie = $svc->buildAnomalieSummaryFromInput(
+            $this->input,
+            $this->anomalyLabelMap(),
+            $this->presidioContextByPiId()
+        );
         $riepilogoEconomico = $svc->buildEconomicSummary(
             (float) data_get($this->ordinePreventivo, 'header.totale_documento', 0),
             $extraPresidi,
@@ -1507,17 +1537,96 @@ public function salvaNuovoPresidio()
 
     private function anomalyLabelMap(): array
     {
-        return collect($this->anomalie)
+        if ($this->anomalyMapCache !== null) {
+            return $this->anomalyMapCache;
+        }
+
+        $this->anomalyMapCache = collect($this->anomalie)
             ->flatten(1)
             ->mapWithKeys(function (Anomalia $anomalia) {
+                $prezziTipoEstintore = collect($anomalia->prezziTipoEstintore ?? [])
+                    ->mapWithKeys(fn ($row) => [
+                        (int) $row->tipo_estintore_id => (float) $row->prezzo,
+                    ])
+                    ->toArray();
+
+                $prezziTipoPresidio = collect($anomalia->prezziTipoPresidio ?? [])
+                    ->mapWithKeys(fn ($row) => [
+                        (int) $row->tipo_presidio_id => (float) $row->prezzo,
+                    ])
+                    ->toArray();
+
                 return [
                     (int) $anomalia->id => [
                         'etichetta' => (string) $anomalia->etichetta,
                         'prezzo' => (float) ($anomalia->prezzo ?? 0),
+                        'usa_prezzi_tipo_estintore' => (bool) ($anomalia->usa_prezzi_tipo_estintore ?? false),
+                        'usa_prezzi_tipo_presidio' => (bool) ($anomalia->usa_prezzi_tipo_presidio ?? false),
+                        'prezzi_tipo_estintore' => $prezziTipoEstintore,
+                        'prezzi_tipo_presidio' => $prezziTipoPresidio,
                     ],
                 ];
             })
             ->toArray();
+
+        return $this->anomalyMapCache;
+    }
+
+    public function prezzoAnomaliaPerPresidio(int $piId, int $anomaliaId): float
+    {
+        $meta = $this->anomalyLabelMap()[$anomaliaId] ?? null;
+        if (!is_array($meta)) {
+            return 0.0;
+        }
+
+        $prezzo = max(0, (float) ($meta['prezzo'] ?? 0));
+        $pi = $this->intervento->presidiIntervento->firstWhere('id', $piId);
+        $presidio = $pi?->presidio;
+
+        if (!$presidio) {
+            return round($prezzo, 2);
+        }
+
+        $categoria = (string) ($presidio->categoria ?? '');
+        if ($categoria === 'Estintore' && (bool) ($meta['usa_prezzi_tipo_estintore'] ?? false)) {
+            $tipoId = (int) ($presidio->tipo_estintore_id ?? 0);
+            $map = is_array($meta['prezzi_tipo_estintore'] ?? null) ? $meta['prezzi_tipo_estintore'] : [];
+            if ($tipoId > 0 && array_key_exists($tipoId, $map)) {
+                return round(max(0, (float) $map[$tipoId]), 2);
+            }
+        }
+
+        if (in_array($categoria, ['Idrante', 'Porta'], true) && (bool) ($meta['usa_prezzi_tipo_presidio'] ?? false)) {
+            $tipoId = $categoria === 'Idrante'
+                ? (int) ($presidio->idrante_tipo_id ?? 0)
+                : (int) ($presidio->porta_tipo_id ?? 0);
+            $map = is_array($meta['prezzi_tipo_presidio'] ?? null) ? $meta['prezzi_tipo_presidio'] : [];
+            if ($tipoId > 0 && array_key_exists($tipoId, $map)) {
+                return round(max(0, (float) $map[$tipoId]), 2);
+            }
+        }
+
+        return round($prezzo, 2);
+    }
+
+    private function presidioContextByPiId(): array
+    {
+        $context = [];
+        foreach ($this->intervento->presidiIntervento as $pi) {
+            $presidio = $pi->presidio;
+            if (!$presidio) {
+                continue;
+            }
+
+            $context[(int) $pi->id] = [
+                'categoria' => (string) ($presidio->categoria ?? ''),
+                'tipo_estintore_id' => (int) ($presidio->tipo_estintore_id ?? 0),
+                'idrante_tipo_id' => (int) ($presidio->idrante_tipo_id ?? 0),
+                'porta_tipo_id' => (int) ($presidio->porta_tipo_id ?? 0),
+            ];
+        }
+
+        return $context;
     }
 
     private function extractAnomalieState(PresidioIntervento $pi): array

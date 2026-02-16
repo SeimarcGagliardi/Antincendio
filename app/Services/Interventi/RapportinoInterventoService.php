@@ -47,6 +47,18 @@ class RapportinoInterventoService
         if (Schema::hasColumn('anomalie', 'prezzo')) {
             $anomaliaQuery->addSelect('prezzo');
         }
+        if (Schema::hasColumn('anomalie', 'usa_prezzi_tipo_estintore')) {
+            $anomaliaQuery->addSelect('usa_prezzi_tipo_estintore');
+        }
+        if (Schema::hasColumn('anomalie', 'usa_prezzi_tipo_presidio')) {
+            $anomaliaQuery->addSelect('usa_prezzi_tipo_presidio');
+        }
+        if (Schema::hasTable('anomalia_prezzi_tipo_estintore')) {
+            $anomaliaQuery->with('prezziTipoEstintore:anomalia_id,tipo_estintore_id,prezzo');
+        }
+        if (Schema::hasTable('anomalia_prezzi_tipo_presidio')) {
+            $anomaliaQuery->with('prezziTipoPresidio:anomalia_id,tipo_presidio_id,prezzo');
+        }
 
         $anomalieRiepilogo = $ordiniSvc->buildAnomalieSummaryFromPresidiIntervento(
             $intervento->presidiIntervento,
@@ -56,6 +68,14 @@ class RapportinoInterventoService
                     $anomalia->id => [
                         'etichetta' => (string) $anomalia->etichetta,
                         'prezzo' => (float) ($anomalia->prezzo ?? 0),
+                        'usa_prezzi_tipo_estintore' => (bool) ($anomalia->usa_prezzi_tipo_estintore ?? false),
+                        'usa_prezzi_tipo_presidio' => (bool) ($anomalia->usa_prezzi_tipo_presidio ?? false),
+                        'prezzi_tipo_estintore' => collect($anomalia->prezziTipoEstintore ?? [])
+                            ->mapWithKeys(fn ($row) => [(int) $row->tipo_estintore_id => (float) $row->prezzo])
+                            ->toArray(),
+                        'prezzi_tipo_presidio' => collect($anomalia->prezziTipoPresidio ?? [])
+                            ->mapWithKeys(fn ($row) => [(int) $row->tipo_presidio_id => (float) $row->prezzo])
+                            ->toArray(),
                     ],
                 ])
                 ->toArray()

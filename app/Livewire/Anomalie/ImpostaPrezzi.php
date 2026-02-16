@@ -3,6 +3,10 @@
 namespace App\Livewire\Anomalie;
 
 use App\Models\Anomalia;
+use App\Models\AnomaliaPrezzoTipoEstintore;
+use App\Models\AnomaliaPrezzoTipoPresidio;
+use App\Models\TipoEstintore;
+use App\Models\TipoPresidio;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -11,13 +15,58 @@ use Livewire\Component;
 class ImpostaPrezzi extends Component
 {
     public bool $hasPrezzoColumn = false;
+    public bool $hasFlagTipoEstintoreColumn = false;
+    public bool $hasFlagTipoPresidioColumn = false;
+    public bool $hasPrezziTipoEstintoreTable = false;
+    public bool $hasPrezziTipoPresidioTable = false;
+
     public array $prezzi = [];
     public array $attive = [];
+    public array $usaPrezziTipoEstintore = [];
+    public array $usaPrezziTipoPresidio = [];
+    public array $prezziTipoEstintore = [];
+    public array $prezziTipoPresidio = [];
+
     public array $invalidPrezzi = [];
+    public array $invalidPrezziTipoEstintore = [];
+    public array $invalidPrezziTipoPresidio = [];
+
+    public array $tipiEstintori = [];
+    public array $tipiPresidio = [];
 
     public function mount(): void
     {
         $this->hasPrezzoColumn = Schema::hasColumn('anomalie', 'prezzo');
+        $this->hasFlagTipoEstintoreColumn = Schema::hasColumn('anomalie', 'usa_prezzi_tipo_estintore');
+        $this->hasFlagTipoPresidioColumn = Schema::hasColumn('anomalie', 'usa_prezzi_tipo_presidio');
+        $this->hasPrezziTipoEstintoreTable = Schema::hasTable('anomalia_prezzi_tipo_estintore');
+        $this->hasPrezziTipoPresidioTable = Schema::hasTable('anomalia_prezzi_tipo_presidio');
+
+        $this->tipiEstintori = TipoEstintore::query()
+            ->select(['id', 'sigla', 'descrizione'])
+            ->orderBy('descrizione')
+            ->orderBy('sigla')
+            ->get()
+            ->map(fn (TipoEstintore $tipo) => [
+                'id' => (int) $tipo->id,
+                'label' => trim((string) ($tipo->sigla . ' ' . $tipo->descrizione)),
+            ])
+            ->values()
+            ->all();
+
+        $this->tipiPresidio = TipoPresidio::query()
+            ->select(['id', 'categoria', 'nome'])
+            ->orderBy('categoria')
+            ->orderBy('nome')
+            ->get()
+            ->map(fn (TipoPresidio $tipo) => [
+                'id' => (int) $tipo->id,
+                'categoria' => (string) $tipo->categoria,
+                'label' => trim((string) $tipo->nome),
+            ])
+            ->values()
+            ->all();
+
         $this->caricaStato();
     }
 
@@ -29,11 +78,33 @@ class ImpostaPrezzi extends Component
         }
 
         if (!$this->persistAnomalia($id)) {
-            $this->dispatch('toast', type: 'error', message: 'Valore prezzo non valido.');
+            $this->dispatch('toast', type: 'error', message: 'Valori prezzo non validi.');
             return;
         }
 
         $this->dispatch('toast', type: 'success', message: 'Anomalia aggiornata.');
+    }
+
+    public function updatedUsaPrezziTipoEstintore($value, $key): void
+    {
+        $id = (int) $key;
+        if ($id <= 0) {
+            return;
+        }
+
+        $this->usaPrezziTipoEstintore[(string) $id] = filter_var($value, FILTER_VALIDATE_BOOL);
+        $this->salvaRiga($id);
+    }
+
+    public function updatedUsaPrezziTipoPresidio($value, $key): void
+    {
+        $id = (int) $key;
+        if ($id <= 0) {
+            return;
+        }
+
+        $this->usaPrezziTipoPresidio[(string) $id] = filter_var($value, FILTER_VALIDATE_BOOL);
+        $this->salvaRiga($id);
     }
 
     public function updatedPrezzi($value, $key): void
@@ -43,11 +114,32 @@ class ImpostaPrezzi extends Component
             return;
         }
 
-        // normalizza in tempo reale input più comuni (virgola italiana)
         $raw = trim((string) $value);
         $normalized = str_replace(',', '.', $raw);
         $this->prezzi[(string) $id] = $normalized;
         unset($this->invalidPrezzi[(string) $id]);
+    }
+
+    public function updatedPrezziTipoEstintore($value, $key): void
+    {
+        [$anomaliaId, $tipoId] = $this->splitNestedKey($key);
+        if ($anomaliaId <= 0 || $tipoId <= 0) {
+            return;
+        }
+
+        $this->prezziTipoEstintore[(string) $anomaliaId][(string) $tipoId] = str_replace(',', '.', trim((string) $value));
+        unset($this->invalidPrezziTipoEstintore[$this->priceKey($anomaliaId, $tipoId)]);
+    }
+
+    public function updatedPrezziTipoPresidio($value, $key): void
+    {
+        [$anomaliaId, $tipoId] = $this->splitNestedKey($key);
+        if ($anomaliaId <= 0 || $tipoId <= 0) {
+            return;
+        }
+
+        $this->prezziTipoPresidio[(string) $anomaliaId][(string) $tipoId] = str_replace(',', '.', trim((string) $value));
+        unset($this->invalidPrezziTipoPresidio[$this->priceKey($anomaliaId, $tipoId)]);
     }
 
     public function salvaRiga(int $anomaliaId): void
@@ -58,7 +150,7 @@ class ImpostaPrezzi extends Component
         }
 
         if (!$this->persistAnomalia($anomaliaId)) {
-            $this->dispatch('toast', type: 'error', message: 'Valore prezzo non valido.');
+            $this->dispatch('toast', type: 'error', message: 'Valori prezzo non validi.');
             return;
         }
 
@@ -95,8 +187,15 @@ class ImpostaPrezzi extends Component
     public function getAnomalieByCategoriaProperty(): Collection
     {
         $query = Anomalia::query()->select(['id', 'categoria', 'etichetta', 'attiva']);
+
         if ($this->hasPrezzoColumn) {
             $query->addSelect('prezzo');
+        }
+        if ($this->hasFlagTipoEstintoreColumn) {
+            $query->addSelect('usa_prezzi_tipo_estintore');
+        }
+        if ($this->hasFlagTipoPresidioColumn) {
+            $query->addSelect('usa_prezzi_tipo_presidio');
         }
 
         return $query
@@ -111,28 +210,61 @@ class ImpostaPrezzi extends Component
         return view('livewire.anomalie.imposta-prezzi', [
             'anomalieByCategoria' => $this->anomalieByCategoria,
             'hasPrezzoColumn' => $this->hasPrezzoColumn,
+            'tipiEstintori' => $this->tipiEstintori,
+            'tipiPresidio' => $this->tipiPresidio,
         ]);
     }
 
     private function caricaStato(): void
     {
         $this->invalidPrezzi = [];
+        $this->invalidPrezziTipoEstintore = [];
+        $this->invalidPrezziTipoPresidio = [];
 
         $query = Anomalia::query()->select(['id', 'attiva']);
         if ($this->hasPrezzoColumn) {
             $query->addSelect('prezzo');
         }
+        if ($this->hasFlagTipoEstintoreColumn) {
+            $query->addSelect('usa_prezzi_tipo_estintore');
+        }
+        if ($this->hasFlagTipoPresidioColumn) {
+            $query->addSelect('usa_prezzi_tipo_presidio');
+        }
+        if ($this->hasPrezziTipoEstintoreTable) {
+            $query->with('prezziTipoEstintore');
+        }
+        if ($this->hasPrezziTipoPresidioTable) {
+            $query->with('prezziTipoPresidio');
+        }
 
         foreach ($query->get() as $anomalia) {
-            $key = (string) $anomalia->id;
+            $id = (int) $anomalia->id;
+            $key = (string) $id;
+
             $this->attive[$key] = (bool) $anomalia->attiva;
             $this->prezzi[$key] = number_format((float) ($anomalia->prezzo ?? 0), 2, '.', '');
+            $this->usaPrezziTipoEstintore[$key] = (bool) ($anomalia->usa_prezzi_tipo_estintore ?? false);
+            $this->usaPrezziTipoPresidio[$key] = (bool) ($anomalia->usa_prezzi_tipo_presidio ?? false);
+
+            $this->prezziTipoEstintore[$key] = collect($anomalia->prezziTipoEstintore ?? [])
+                ->mapWithKeys(fn ($row) => [
+                    (string) ((int) $row->tipo_estintore_id) => number_format((float) ($row->prezzo ?? 0), 2, '.', ''),
+                ])
+                ->toArray();
+
+            $this->prezziTipoPresidio[$key] = collect($anomalia->prezziTipoPresidio ?? [])
+                ->mapWithKeys(fn ($row) => [
+                    (string) ((int) $row->tipo_presidio_id) => number_format((float) ($row->prezzo ?? 0), 2, '.', ''),
+                ])
+                ->toArray();
         }
     }
 
     private function persistAnomalia(int $anomaliaId): bool
     {
-        if (!Anomalia::query()->whereKey($anomaliaId)->exists()) {
+        $anomalia = Anomalia::query()->find($anomaliaId);
+        if (!$anomalia) {
             return true;
         }
 
@@ -150,11 +282,22 @@ class ImpostaPrezzi extends Component
             $payload['prezzo'] = $parsedPrezzo;
         }
 
+        $useTipoEst = $this->hasFlagTipoEstintoreColumn
+            && (bool) $this->valueById($this->usaPrezziTipoEstintore, $anomaliaId, false);
+        $useTipoPres = $this->hasFlagTipoPresidioColumn
+            && (bool) $this->valueById($this->usaPrezziTipoPresidio, $anomaliaId, false);
+
+        if ($this->hasFlagTipoEstintoreColumn) {
+            $payload['usa_prezzi_tipo_estintore'] = $useTipoEst;
+        }
+        if ($this->hasFlagTipoPresidioColumn) {
+            $payload['usa_prezzi_tipo_presidio'] = $useTipoPres;
+        }
+
         try {
-            Anomalia::query()->whereKey($anomaliaId)->update($payload);
-            $anomalia = Anomalia::query()->select(['id', 'attiva', 'prezzo'])->find($anomaliaId);
+            $anomalia->update($payload);
         } catch (\Throwable $e) {
-            Log::error('Errore salvataggio prezzo anomalia', [
+            Log::error('Errore salvataggio anomalia', [
                 'anomalia_id' => $anomaliaId,
                 'payload' => $payload,
                 'message' => $e->getMessage(),
@@ -162,14 +305,140 @@ class ImpostaPrezzi extends Component
             return false;
         }
 
-        if ($anomalia) {
-            $this->attive[(string) $anomaliaId] = (bool) $anomalia->attiva;
-            if ($this->hasPrezzoColumn) {
-                $this->prezzi[(string) $anomaliaId] = number_format((float) ($anomalia->prezzo ?? 0), 2, '.', '');
+        if ($this->hasPrezziTipoEstintoreTable) {
+            if (!$this->persistPrezziTipoEstintore($anomaliaId, $useTipoEst)) {
+                return false;
+            }
+        }
+
+        if ($this->hasPrezziTipoPresidioTable) {
+            if (!$this->persistPrezziTipoPresidio($anomaliaId, $useTipoPres)) {
+                return false;
             }
         }
 
         return true;
+    }
+
+    private function persistPrezziTipoEstintore(int $anomaliaId, bool $enabled): bool
+    {
+        if (!$enabled) {
+            AnomaliaPrezzoTipoEstintore::query()
+                ->where('anomalia_id', $anomaliaId)
+                ->delete();
+            return true;
+        }
+
+        $rows = $this->valueById($this->prezziTipoEstintore, $anomaliaId, []);
+        $rows = is_array($rows) ? $rows : [];
+
+        $keep = [];
+        foreach ($rows as $tipoIdRaw => $rawPrice) {
+            $tipoId = (int) $tipoIdRaw;
+            if ($tipoId <= 0) {
+                continue;
+            }
+
+            $parsed = $this->parsePrezzoTipologia($rawPrice);
+            $key = $this->priceKey($anomaliaId, $tipoId);
+
+            if ($parsed === false) {
+                $this->invalidPrezziTipoEstintore[$key] = true;
+                return false;
+            }
+
+            unset($this->invalidPrezziTipoEstintore[$key]);
+
+            if ($parsed === null) {
+                continue;
+            }
+
+            AnomaliaPrezzoTipoEstintore::query()->updateOrCreate(
+                [
+                    'anomalia_id' => $anomaliaId,
+                    'tipo_estintore_id' => $tipoId,
+                ],
+                [
+                    'prezzo' => $parsed,
+                ]
+            );
+            $keep[] = $tipoId;
+        }
+
+        AnomaliaPrezzoTipoEstintore::query()
+            ->where('anomalia_id', $anomaliaId)
+            ->when(!empty($keep), fn ($q) => $q->whereNotIn('tipo_estintore_id', $keep))
+            ->delete();
+
+        return true;
+    }
+
+    private function persistPrezziTipoPresidio(int $anomaliaId, bool $enabled): bool
+    {
+        if (!$enabled) {
+            AnomaliaPrezzoTipoPresidio::query()
+                ->where('anomalia_id', $anomaliaId)
+                ->delete();
+            return true;
+        }
+
+        $rows = $this->valueById($this->prezziTipoPresidio, $anomaliaId, []);
+        $rows = is_array($rows) ? $rows : [];
+
+        $keep = [];
+        foreach ($rows as $tipoIdRaw => $rawPrice) {
+            $tipoId = (int) $tipoIdRaw;
+            if ($tipoId <= 0) {
+                continue;
+            }
+
+            $parsed = $this->parsePrezzoTipologia($rawPrice);
+            $key = $this->priceKey($anomaliaId, $tipoId);
+
+            if ($parsed === false) {
+                $this->invalidPrezziTipoPresidio[$key] = true;
+                return false;
+            }
+
+            unset($this->invalidPrezziTipoPresidio[$key]);
+
+            if ($parsed === null) {
+                continue;
+            }
+
+            AnomaliaPrezzoTipoPresidio::query()->updateOrCreate(
+                [
+                    'anomalia_id' => $anomaliaId,
+                    'tipo_presidio_id' => $tipoId,
+                ],
+                [
+                    'prezzo' => $parsed,
+                ]
+            );
+            $keep[] = $tipoId;
+        }
+
+        AnomaliaPrezzoTipoPresidio::query()
+            ->where('anomalia_id', $anomaliaId)
+            ->when(!empty($keep), fn ($q) => $q->whereNotIn('tipo_presidio_id', $keep))
+            ->delete();
+
+        return true;
+    }
+
+    private function splitNestedKey($key): array
+    {
+        $parts = explode('.', (string) $key);
+        if (count($parts) < 2) {
+            return [0, 0];
+        }
+
+        return [(int) $parts[0], (int) $parts[1]];
+    }
+
+    private function priceKey(int $anomaliaId, int $tipoId): string
+    {
+        return $anomaliaId . ':' . $tipoId;
     }
 
     private function valueById(array $source, int $id, $default = null)
@@ -208,4 +477,26 @@ class ImpostaPrezzi extends Component
 
         return max(0, round((float) $value, 2));
     }
+
+    /**
+     * Ritorna:
+     * - float => prezzo valido
+     * - null  => campo vuoto (usa fallback al prezzo generico)
+     * - false => non valido
+     */
+    private function parsePrezzoTipologia($raw)
+    {
+        $value = trim((string) $raw);
+        if ($value === '') {
+            return null;
+        }
+
+        $parsed = $this->parsePrezzo($value);
+        if ($parsed === null) {
+            return false;
+        }
+
+        return $parsed;
+    }
 }
+

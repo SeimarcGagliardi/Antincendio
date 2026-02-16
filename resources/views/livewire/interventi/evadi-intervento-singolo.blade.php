@@ -393,7 +393,7 @@
                                                 $anomMap = $anomList->mapWithKeys(fn($row) => [
                                                     (int) $row->id => [
                                                         'etichetta' => (string) $row->etichetta,
-                                                        'prezzo' => (float) ($row->prezzo ?? 0),
+                                                        'prezzo' => (float) $this->prezzoAnomaliaPerPresidio($pi->id, (int) $row->id),
                                                     ],
                                                 ])->toArray();
                                             @endphp
@@ -407,8 +407,9 @@
                                                                    wire:change="toggleAnomalia({{ $pi->id }}, {{ $anomalia->id }}, $event.target.checked)"
                                                                    class="h-5 w-5 border-gray-300">
                                                             <span>{{ $anomalia->etichetta }}</span>
-                                                            @if((float)($anomalia->prezzo ?? 0) > 0)
-                                                                <span class="text-[11px] text-gray-500">(+€ {{ number_format((float)$anomalia->prezzo, 2, ',', '.') }})</span>
+                                                            @php $prezzoAnomalia = (float)($anomMap[(int)$anomalia->id]['prezzo'] ?? 0); @endphp
+                                                            @if($prezzoAnomalia > 0)
+                                                                <span class="text-[11px] text-gray-500">(+€ {{ number_format($prezzoAnomalia, 2, ',', '.') }})</span>
                                                             @endif
                                                         </label>
                                                     @empty
@@ -740,11 +741,11 @@
                             $anomList = ($anomalie[$pi->presidio->categoria] ?? collect());
                             $selectedAnom = collect($input[$pi->id]['anomalie'] ?? [])->map(fn($v)=>(int)$v)->values()->all();
                             $anomMap = $anomList->mapWithKeys(fn($row) => [
-                                (int) $row->id => [
-                                    'etichetta' => (string) $row->etichetta,
-                                    'prezzo' => (float) ($row->prezzo ?? 0),
-                                ],
-                            ])->toArray();
+                                                    (int) $row->id => [
+                                                        'etichetta' => (string) $row->etichetta,
+                                                        'prezzo' => (float) $this->prezzoAnomaliaPerPresidio($pi->id, (int) $row->id),
+                                                    ],
+                                                ])->toArray();
                         @endphp
                         <div class="space-y-2">
                             <div class="space-y-1 max-h-44 overflow-auto border border-gray-200 rounded p-2 bg-white">
@@ -756,8 +757,9 @@
                                                wire:change="toggleAnomalia({{ $pi->id }}, {{ $anomalia->id }}, $event.target.checked)"
                                                class="h-5 w-5 border-gray-300">
                                         <span>{{ $anomalia->etichetta }}</span>
-                                        @if((float)($anomalia->prezzo ?? 0) > 0)
-                                            <span class="text-[11px] text-gray-500">(+€ {{ number_format((float)$anomalia->prezzo, 2, ',', '.') }})</span>
+                                        @php $prezzoAnomalia = (float)($anomMap[(int)$anomalia->id]['prezzo'] ?? 0); @endphp
+                                        @if($prezzoAnomalia > 0)
+                                            <span class="text-[11px] text-gray-500">(+€ {{ number_format($prezzoAnomalia, 2, ',', '.') }})</span>
                                         @endif
                                     </label>
                                 @empty
