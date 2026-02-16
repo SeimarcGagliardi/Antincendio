@@ -12,6 +12,7 @@ use App\Models\TipoEstintore;
 use App\Models\InterventoTecnico;
 use App\Models\InterventoTecnicoSessione;
 use App\Models\MailQueueItem;
+use App\Jobs\ProcessMailQueueItemJob;
 use App\Models\TipoPresidio;
 use App\Services\Clienti\BusinessFormaPagamentoService;
 use App\Services\Interventi\OrdinePreventivoService;
@@ -1747,7 +1748,7 @@ public function salvaNuovoPresidio()
 
         $delay = max(0, (int) config('interventi.internal_report_delay_minutes', 10));
 
-        MailQueueItem::create([
+        $item = MailQueueItem::create([
             'intervento_id' => $interventoId,
             'tipo' => 'rapportino_interno',
             'to_email' => $destinatario,
@@ -1764,6 +1765,13 @@ public function salvaNuovoPresidio()
             'status' => 'queued',
             'attempts' => 0,
         ]);
+
+        // Se il worker queue e' attivo, questa dispatch garantisce l'invio senza dipendere dal scheduler cron.
+        if (config('queue.default') !== 'sync') {
+            ProcessMailQueueItemJob::dispatch((int) $item->id)
+                ->delay(now()->addMinutes($delay))
+                ->onQueue('default');
+        }
     }
 
     private function buildClienteMailtoUrl(string $clientePdfUrl): ?string
