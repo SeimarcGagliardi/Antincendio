@@ -1,13 +1,13 @@
 <div class="space-y-4">
-    <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-4 flex items-center justify-between">
-        <button wire:click="settimanaPrecedente" class="btn btn-sm btn-outline">
+    <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <button wire:click="settimanaPrecedente" class="btn btn-sm btn-outline min-h-10">
             ⬅️ Settimana precedente
         </button>
         <div class="text-center">
             <h2 class="text-lg font-bold">Settimana dal {{ \Carbon\Carbon::parse($inizioSettimana)->format('d/m/Y') }}</h2>
             <div class="text-xs text-gray-500">Vista settimanale tecnici</div>
         </div>
-        <button wire:click="settimanaSuccessiva" class="btn btn-sm btn-outline">
+        <button wire:click="settimanaSuccessiva" class="btn btn-sm btn-outline min-h-10">
             Settimana successiva ➡️
         </button>
     </div>

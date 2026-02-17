@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use Livewire\Component;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Carbon;
 use Carbon\CarbonPeriod;
 
@@ -74,6 +75,7 @@ class StatisticheAvanzate extends Component
     private function loadData(): void
     {
         [$da, $a] = $this->normalizedRange();
+        $hasAnomaliaItemsTable = Schema::hasTable('presidio_intervento_anomalie');
 
         $baseInterventi = DB::table('interventi')
             ->whereBetween('data_intervento', [$da, $a])
@@ -157,8 +159,22 @@ class StatisticheAvanzate extends Component
             ->join('interventi', 'interventi.id', '=', 'presidi_intervento.intervento_id')
             ->where('interventi.stato', 'Completato')
             ->whereBetween('interventi.data_intervento', [$da, $a])
-            ->whereNotNull('presidi_intervento.anomalie')
-            ->where('presidi_intervento.anomalie', '<>', '[]')
+            ->where(function ($query) use ($hasAnomaliaItemsTable) {
+                if ($hasAnomaliaItemsTable) {
+                    $query->whereExists(function ($sub) {
+                        $sub->selectRaw('1')
+                            ->from('presidio_intervento_anomalie as pia')
+                            ->whereColumn('pia.presidio_intervento_id', 'presidi_intervento.id');
+                    })->orWhere(function ($legacy) {
+                        $legacy->whereNotNull('presidi_intervento.anomalie')
+                            ->where('presidi_intervento.anomalie', '<>', '[]');
+                    });
+                    return;
+                }
+
+                $query->whereNotNull('presidi_intervento.anomalie')
+                    ->where('presidi_intervento.anomalie', '<>', '[]');
+            })
             ->selectRaw('presidi.categoria as label, COUNT(*) as totale')
             ->groupBy('presidi.categoria')
             ->orderByDesc('totale')
@@ -371,6 +387,7 @@ class StatisticheAvanzate extends Component
         [$da, $a] = $this->normalizedRange();
         $driver = DB::getDriverName();
         $anomalyMap = DB::table('anomalie')->pluck('etichetta', 'id')->toArray();
+        $hasAnomaliaItemsTable = Schema::hasTable('presidio_intervento_anomalie');
 
         if (in_array($chart, ['tecnici', 'durata'], true)) {
             $rows = DB::table('interventi')
@@ -503,31 +520,83 @@ class StatisticheAvanzate extends Component
                 $label = $this->formatEsitoLabel((string) $label);
             }
             if ($chart === 'anomalie') {
-                $query->whereNotNull('presidi_intervento.anomalie')
-                    ->where('presidi_intervento.anomalie', '<>', '[]');
+                $query->where(function ($w) use ($hasAnomaliaItemsTable) {
+                    if ($hasAnomaliaItemsTable) {
+                        $w->whereExists(function ($sub) {
+                            $sub->selectRaw('1')
+                                ->from('presidio_intervento_anomalie as pia')
+                                ->whereColumn('pia.presidio_intervento_id', 'presidi_intervento.id');
+                        })->orWhere(function ($legacy) {
+                            $legacy->whereNotNull('presidi_intervento.anomalie')
+                                ->where('presidi_intervento.anomalie', '<>', '[]');
+                        });
+                        return;
+                    }
+
+                    $w->whereNotNull('presidi_intervento.anomalie')
+                        ->where('presidi_intervento.anomalie', '<>', '[]');
+                });
                 $query->where('presidi.categoria', $key);
                 $titlePrefix = 'Anomalie categoria';
             }
 
-            $rows = $query->selectRaw('interventi.data_intervento, clienti.nome as cliente, sedi.nome as sede, presidi.progressivo, presidi.categoria, tipi_estintori.sigla as tipo, presidi_intervento.esito, presidi_intervento.anomalie')
+            $rows = $query->selectRaw('presidi_intervento.id as presidio_intervento_id, interventi.data_intervento, clienti.nome as cliente, sedi.nome as sede, presidi.progressivo, presidi.categoria, tipi_estintori.sigla as tipo, presidi_intervento.esito, presidi_intervento.anomalie')
                 ->orderByDesc('interventi.data_intervento')
                 ->limit(300)
                 ->get();
 
+            $anomalieItemsByPi = [];
+            if ($hasAnomaliaItemsTable && $rows->isNotEmpty()) {
+                $piIds = $rows->pluck('presidio_intervento_id')
+                    ->filter(fn ($id) => is_numeric($id))
+                    ->map(fn ($id) => (int) $id)
+                    ->unique()
+                    ->values()
+                    ->all();
+
+                if (!empty($piIds)) {
+                    $anomalieItemsByPi = DB::table('presidio_intervento_anomalie')
+                        ->whereIn('presidio_intervento_id', $piIds)
+                        ->select(['presidio_intervento_id', 'anomalia_id'])
+                        ->get()
+                        ->groupBy('presidio_intervento_id')
+                        ->map(fn ($items) => $items->pluck('anomalia_id')
+                            ->filter(fn ($id) => is_numeric($id))
+                            ->map(fn ($id) => (int) $id)
+                            ->unique()
+                            ->values()
+                            ->all()
+                        )
+                        ->toArray();
+                }
+            }
+
             $this->drilldown = [
                 'title' => "{$titlePrefix}: {$label}",
                 'headers' => ['Data', 'Cliente', 'Sede', 'Progressivo', 'Tipo', 'Esito', 'Anomalie'],
-                'rows' => $rows->map(function ($r) use ($anomalyMap) {
-                    $anomaliaText = '-';
-                    if (!empty($r->anomalie)) {
-                        $decoded = json_decode($r->anomalie, true);
+                'rows' => $rows->map(function ($r) use ($anomalyMap, $anomalieItemsByPi) {
+                    $anomalieIds = [];
+                    $piId = is_numeric($r->presidio_intervento_id ?? null) ? (int) $r->presidio_intervento_id : null;
+
+                    if ($piId && !empty($anomalieItemsByPi[$piId])) {
+                        $anomalieIds = $anomalieItemsByPi[$piId];
+                    } elseif (!empty($r->anomalie)) {
+                        $decoded = json_decode((string) $r->anomalie, true);
                         if (is_array($decoded)) {
-                            $labels = [];
-                            foreach ($decoded as $id) {
-                                $labels[] = $anomalyMap[$id] ?? (string) $id;
-                            }
-                            $anomaliaText = implode(', ', $labels);
+                            $anomalieIds = collect($decoded)
+                                ->filter(fn ($id) => is_numeric($id))
+                                ->map(fn ($id) => (int) $id)
+                                ->unique()
+                                ->values()
+                                ->all();
                         }
+                    }
+
+                    $anomaliaText = collect($anomalieIds)
+                        ->map(fn ($id) => $anomalyMap[$id] ?? (string) $id)
+                        ->implode(', ');
+                    if ($anomaliaText === '') {
+                        $anomaliaText = '-';
                     }
 
                     return [

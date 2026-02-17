@@ -66,7 +66,6 @@ class PlanningSettimanale extends Component
         }else{
             $this->dispatch('toast', type: 'warning', message: 'Intervento non eliminabile in quanto COMPLETATO!');
         }
-        $this->render();
     }
     
 
@@ -91,17 +90,35 @@ class PlanningSettimanale extends Component
     public function render()
     {
         $this->giorn= $this->giorniSettimana();
-$gior = $this->giorn;
+        $gior = $this->giorn;
+
+        $from = $gior->first()['data']->toDateString();
+        $to = $gior->last()['data']->toDateString();
+
         $tecnici = User::whereHas('ruoli', function ($query) {
             $query->where('nome', 'Tecnico');
-        })->with(['ruoli', 'interventi' => function ($q) use ($gior) {
-            $q->whereBetween('data_intervento', [
-                $gior->first()['data']->toDateString(),
-                $gior->last()['data']->toDateString()
-            ]);
-            
-        }, 'interventi.cliente', 'interventi.sede'])->get();
-        
+        })
+            ->select(['id', 'name'])
+            ->with([
+                'ruoli:id,nome',
+                'interventi' => function ($q) use ($from, $to) {
+                    $q->select([
+                        'interventi.id',
+                        'interventi.cliente_id',
+                        'interventi.sede_id',
+                        'interventi.data_intervento',
+                        'interventi.durata_minuti',
+                        'interventi.stato',
+                    ])
+                        ->whereBetween('data_intervento', [$from, $to])
+                        ->orderByRaw('intervento_tecnico.scheduled_start_at IS NULL')
+                        ->orderBy('intervento_tecnico.scheduled_start_at')
+                        ->orderBy('interventi.id');
+                },
+                'interventi.cliente:id,nome',
+                'interventi.sede:id,nome',
+            ])
+            ->get();
 
         return view('livewire.interventi.planning-settimanale', [
             'giorni' => $this->giorn,

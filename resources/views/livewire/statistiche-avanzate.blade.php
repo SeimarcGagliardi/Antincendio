@@ -13,33 +13,35 @@
                     <h1 class="text-2xl font-semibold">Statistiche Interventi</h1>
                     <p class="text-sm text-white/80">Periodo {{ $dataDa }} → {{ $dataA }}</p>
                 </div>
-                <div class="flex items-center gap-2">
-                    <button wire:click="preset('month')" class="px-3 py-1.5 rounded-full text-xs font-medium"
-                            style="{{ $presetAttivo === 'month' ? 'background:#ffffff;color:#0f172a;' : 'background:rgba(255,255,255,0.18);color:rgba(255,255,255,0.9);' }}">
-                        Mese
-                    </button>
-                    <button wire:click="preset('30d')" class="px-3 py-1.5 rounded-full text-xs font-medium"
-                            style="{{ $presetAttivo === '30d' ? 'background:#ffffff;color:#0f172a;' : 'background:rgba(255,255,255,0.18);color:rgba(255,255,255,0.9);' }}">
-                        30 giorni
-                    </button>
-                    <button wire:click="preset('90d')" class="px-3 py-1.5 rounded-full text-xs font-medium"
-                            style="{{ $presetAttivo === '90d' ? 'background:#ffffff;color:#0f172a;' : 'background:rgba(255,255,255,0.18);color:rgba(255,255,255,0.9);' }}">
-                        90 giorni
-                    </button>
-                    <button wire:click="preset('ytd')" class="px-3 py-1.5 rounded-full text-xs font-medium"
-                            style="{{ $presetAttivo === 'ytd' ? 'background:#ffffff;color:#0f172a;' : 'background:rgba(255,255,255,0.18);color:rgba(255,255,255,0.9);' }}">
-                        YTD
-                    </button>
-                    <button wire:click="preset('year')" class="px-3 py-1.5 rounded-full text-xs font-medium"
-                            style="{{ $presetAttivo === 'year' ? 'background:#ffffff;color:#0f172a;' : 'background:rgba(255,255,255,0.18);color:rgba(255,255,255,0.9);' }}">
-                        Ultimo anno
-                    </button>
-                    @if($presetAttivo === 'custom')
-                        <span class="px-2 py-1 rounded-full text-[10px] uppercase tracking-wide"
-                              style="background: rgba(255,255,255,0.25); color: rgba(255,255,255,0.95);">
-                            Personalizzato
-                        </span>
-                    @endif
+                <div class="overflow-x-auto">
+                    <div class="flex items-center gap-2 min-w-max pb-1">
+                        <button wire:click="preset('month')" class="px-3 py-1.5 rounded-full text-xs font-medium"
+                                style="{{ $presetAttivo === 'month' ? 'background:#ffffff;color:#0f172a;' : 'background:rgba(255,255,255,0.18);color:rgba(255,255,255,0.9);' }}">
+                            Mese
+                        </button>
+                        <button wire:click="preset('30d')" class="px-3 py-1.5 rounded-full text-xs font-medium"
+                                style="{{ $presetAttivo === '30d' ? 'background:#ffffff;color:#0f172a;' : 'background:rgba(255,255,255,0.18);color:rgba(255,255,255,0.9);' }}">
+                            30 giorni
+                        </button>
+                        <button wire:click="preset('90d')" class="px-3 py-1.5 rounded-full text-xs font-medium"
+                                style="{{ $presetAttivo === '90d' ? 'background:#ffffff;color:#0f172a;' : 'background:rgba(255,255,255,0.18);color:rgba(255,255,255,0.9);' }}">
+                            90 giorni
+                        </button>
+                        <button wire:click="preset('ytd')" class="px-3 py-1.5 rounded-full text-xs font-medium"
+                                style="{{ $presetAttivo === 'ytd' ? 'background:#ffffff;color:#0f172a;' : 'background:rgba(255,255,255,0.18);color:rgba(255,255,255,0.9);' }}">
+                            YTD
+                        </button>
+                        <button wire:click="preset('year')" class="px-3 py-1.5 rounded-full text-xs font-medium"
+                                style="{{ $presetAttivo === 'year' ? 'background:#ffffff;color:#0f172a;' : 'background:rgba(255,255,255,0.18);color:rgba(255,255,255,0.9);' }}">
+                            Ultimo anno
+                        </button>
+                        @if($presetAttivo === 'custom')
+                            <span class="px-2 py-1 rounded-full text-[10px] uppercase tracking-wide"
+                                  style="background: rgba(255,255,255,0.25); color: rgba(255,255,255,0.95);">
+                                Personalizzato
+                            </span>
+                        @endif
+                    </div>
                 </div>
             </div>
         </div>
@@ -82,22 +84,24 @@
                         <button wire:click="applyFilters" class="btn btn-primary w-full">Aggiorna dati</button>
                     </div>
                 </div>
-                <div class="flex flex-wrap gap-2">
-                    @foreach ([
-                        'tecnici' => 'Tecnici',
-                        'clienti' => 'Clienti',
-                        'durata' => 'Durata',
-                        'categoria' => 'Categorie',
-                        'anomalie' => 'Anomalie',
-                        'trend' => 'Trend',
-                        'esiti' => 'Esiti'
-                    ] as $key => $label)
-                        <button wire:click="$set('graficoSelezionato','{{ $key }}')"
-                            class="px-3 py-1.5 rounded-full text-xs font-medium border"
-                            style="{{ $graficoSelezionato === $key ? 'background:#0f172a;color:#ffffff;border-color:#0f172a;' : 'background:#ffffff;color:#334155;border-color:#e2e8f0;' }}">
-                            {{ $label }}
-                        </button>
-                    @endforeach
+                <div class="overflow-x-auto">
+                    <div class="flex gap-2 min-w-max lg:min-w-0 lg:flex-wrap pb-1">
+                        @foreach ([
+                            'tecnici' => 'Tecnici',
+                            'clienti' => 'Clienti',
+                            'durata' => 'Durata',
+                            'categoria' => 'Categorie',
+                            'anomalie' => 'Anomalie',
+                            'trend' => 'Trend',
+                            'esiti' => 'Esiti'
+                        ] as $key => $label)
+                            <button wire:click="$set('graficoSelezionato','{{ $key }}')"
+                                class="px-3 py-1.5 rounded-full text-xs font-medium border"
+                                style="{{ $graficoSelezionato === $key ? 'background:#0f172a;color:#ffffff;border-color:#0f172a;' : 'background:#ffffff;color:#334155;border-color:#e2e8f0;' }}">
+                                {{ $label }}
+                            </button>
+                        @endforeach
+                    </div>
                 </div>
             </div>
         </div>
@@ -128,7 +132,7 @@
                         Nessun dato disponibile per il periodo selezionato.
                     </div>
                 @else
-                    <div wire:ignore class="relative h-[360px]">
+                    <div wire:ignore class="relative h-[300px] sm:h-[360px]">
                         <canvas id="statistiche-canvas"></canvas>
                     </div>
                 @endif
